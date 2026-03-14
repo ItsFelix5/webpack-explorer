@@ -1,0 +1,132 @@
+* {
+  margin: 0;
+}
+
+body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--editor-background);
+  color: var(--editor-foreground);
+  font-family: "Consolas", "Cascadia Code", "Fira Mono", "Menlo", monospace;
+  font-size: 13px;
+  display: flex;
+}
+
+::selection {
+  background-color: var(--editor-selectionBackground);
+}
+
+.highlighted,
+.highlighted-hover {
+  border-color: var(--editor-selectionHighlightBorder);
+  border-radius: 4px;
+}
+
+.highlighted-hover {
+  background-color: color-mix(
+    in srgb,
+    var(--editor-selectionHighlightBackground) 50%,
+    transparent
+  );
+}
+
+.definition-hover {
+  background-color: color-mix(
+    in srgb,
+    var(--editor-selectionHighlightBackground) 80%,
+    transparent
+  );
+}
+
+.highlighted {
+  background-color: color-mix(
+    in srgb,
+    var(--editor-selectionHighlightBackground) 75%,
+    transparent
+  );
+}
+
+.definition {
+  background-color: var(--editor-selectionHighlightBackground);
+}
+
+body.ctrl .highlighted-hover:hover,
+body.ctrl [data-module-id]:hover {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.header {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--descriptionForeground);
+  border-bottom: 1px solid var(--panel-border);
+  flex: 0 0 auto;
+  user-select: none;
+}
+
+button {
+  display: block;
+  border: none;
+  background-color: transparent;
+  color: var(--editor-foreground);
+}
+
+.sidebar-item {
+  text-align: left;
+  margin: 0px 8px 0px 8px;
+  width: calc(100% - 16px);
+  border-radius: 4px;
+}
+
+pre {
+  width: 100%;
+  height: 100vh;
+  overflow: scroll;
+}
+
+pre .indent {
+  display: inline-block;
+  position: relative;
+  left: var(--indent-offset);
+}
+
+pre .indent:empty {
+  height: 1lh;
+  vertical-align: bottom;
+}
+
+pre .indent::before {
+  content: "";
+  position: absolute;
+  opacity: 0.15;
+  width: 1px;
+  height: 100%;
+  background-color: currentColor;
+}
+
+code {
+  counter-reset: step;
+  counter-increment: step 0;
+}
+
+code .line {
+  display: block;
+}
+
+code .line::before {
+  content: counter(step);
+  counter-increment: step;
+  width: 1rem;
+  margin: 0 1rem 0 0.5rem;
+  display: inline-block;
+  text-align: right;
+  color: var(--editorLineNumber-foreground);
+}
+
+svg {
+  vertical-align: middle;
+}

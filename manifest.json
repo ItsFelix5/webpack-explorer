@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Slack Loader",
+  "version": "1.0.0",
+  "permissions": [],
+  "host_permissions": ["*://app.slack.com/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "devtools_page": "devtools.html"
+}
