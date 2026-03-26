@@ -4,8 +4,8 @@ import traverse, { Binding } from "@babel/traverse";
 export function getReferences(code: string) {
   const ast = parse(code, { plugins: ["jsx"] });
 
-  const tokenMap = new Map<number, string>();
-  const definitions = new Map<string, number>();
+  const tokenMap = new Map<number, number>();
+  const definitions = new Map<number, number>();
   const visited = new Set<Binding>();
   let counter = 0;
 
@@ -15,12 +15,12 @@ export function getReferences(code: string) {
       for (const binding of Object.values(allBindings)) {
         if (!binding || visited.has(binding)) continue;
         visited.add(binding);
-        const id = String(counter++);
+        const id = counter++;
 
-        tokenMap.set(binding.identifier.start, id);
-        definitions.set(id, binding.identifier.start);
+        tokenMap.set(binding.identifier.start!, id);
+        definitions.set(id, binding.identifier.start!);
         for (const refPath of binding.referencePaths) {
-          if (refPath.node) tokenMap.set(refPath.node.start, id);
+          if (refPath.node) tokenMap.set(refPath.node.start!, id);
         }
       }
     },

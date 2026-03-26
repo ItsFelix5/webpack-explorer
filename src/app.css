@@ -1,3 +1,7 @@
+:root {
+  --bookmark: #f4e803;
+}
+
 * {
   margin: 0;
 }
@@ -6,7 +10,7 @@ body {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: var(--editor-background);
+  background: var(--editor-background, #1e1e1e);
   color: var(--editor-foreground);
   font-family: "Consolas", "Cascadia Code", "Fira Mono", "Menlo", monospace;
   font-size: 13px;
@@ -31,7 +35,7 @@ body {
   );
 }
 
-.definition-hover {
+.highlighted-hover[data-definition] {
   background-color: color-mix(
     in srgb,
     var(--editor-selectionHighlightBackground) 80%,
@@ -47,12 +51,12 @@ body {
   );
 }
 
-.definition {
+.highlighted[data-definition] {
   background-color: var(--editor-selectionHighlightBackground);
 }
 
 body.ctrl .highlighted-hover:hover,
-body.ctrl [data-module-id]:hover {
+body.ctrl .module:hover {
   text-decoration: underline;
   cursor: pointer;
 }
@@ -79,6 +83,10 @@ button {
   text-align: left;
   margin: 0px 8px 0px 8px;
   width: calc(100% - 16px);
+}
+
+.selected {
+  background-color: var(--editor-selectionBackground);
   border-radius: 4px;
 }
 
@@ -86,20 +94,16 @@ pre {
   width: 100%;
   height: 100vh;
   overflow: scroll;
+  background-color: var(--editor-background);
+  color: var(--editor-foreground);
 }
 
-pre .indent {
+.line .indent {
   display: inline-block;
   position: relative;
-  left: var(--indent-offset);
 }
 
-pre .indent:empty {
-  height: 1lh;
-  vertical-align: bottom;
-}
-
-pre .indent::before {
+.line .indent::before {
   content: "";
   position: absolute;
   opacity: 0.15;
@@ -108,23 +112,36 @@ pre .indent::before {
   background-color: currentColor;
 }
 
-code {
-  counter-reset: step;
-  counter-increment: step 0;
-}
-
-code .line {
-  display: block;
-}
-
-code .line::before {
-  content: counter(step);
-  counter-increment: step;
+.lineNumber {
+  position: relative;
   width: 1rem;
+  height: 100%;
   margin: 0 1rem 0 0.5rem;
   display: inline-block;
   text-align: right;
   color: var(--editorLineNumber-foreground);
+  user-select: none;
+}
+
+.lineNumber > svg {
+  position: absolute;
+  width: 100%;
+  left: 0;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.lineNumber:hover > svg {
+  opacity: 1;
+}
+
+.lineNumber > span {
+  opacity: 1;
+  transition: opacity 150ms ease;
+}
+
+.lineNumber:hover > span {
+  opacity: 0;
 }
 
 svg {

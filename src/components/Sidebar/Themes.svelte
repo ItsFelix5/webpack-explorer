@@ -1,26 +1,24 @@
 <script lang="ts">
   import { Sun, Moon } from "@lucide/svelte";
-  import { applyTheme, theme } from "../../lib/highlight";
   import themes from "../../lib/themes";
+  import { getContext } from "svelte";
+  import type { App, ThemeName } from "src/types";
+
+  let ctx: App = getContext("app");
 </script>
 
 <div class="header">Theme</div>
 <div>
-  {#each Object.entries(themes).sort((a, b) => {
-    if (a[1].dark !== b[1].dark) return (a[1].dark ? 0 : 1) - (b[1].dark ? 0 : 1);
-    return a[1].name.localeCompare(b[1].name);
-  }) as [id, { name, dark }]}
+  {#each Object.entries(themes) as [id, { name, dark }]}
     <button
       class="sidebar-item"
-      on:click={() => applyTheme(id as keyof typeof themes)}
-      style:background-color={$theme === id
-        ? "var(--editor-selectionBackground)"
-        : "transparent"}
+      onclick={() => (ctx.theme = id as ThemeName)}
+      class:selected={ctx.theme === id}
     >
       {#if dark}
-        <Moon size={12} strokeWidth={4} />
+        <Moon size={12} strokeWidth={3} />
       {:else}
-        <Sun size={12} strokeWidth={4} />
+        <Sun size={12} strokeWidth={3} />
       {/if}
       {name}
     </button>

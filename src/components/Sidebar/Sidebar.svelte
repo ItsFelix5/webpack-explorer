@@ -1,17 +1,24 @@
 <script lang="ts">
   import {
-    Code as CodeIcon,
-    Search as SearchIcon,
-    Palette as PalleteIcon,
-    Settings as SettingsIcon,
+    CodeIcon,
+    SearchIcon,
+    BookmarkIcon,
+    BookAIcon,
+    PaletteIcon,
+    SettingsIcon,
   } from "@lucide/svelte";
   import Modules from "./Modules.svelte";
   import Search from "./Search.svelte";
   import Themes from "./Themes.svelte";
+  import Settings from "./Settings.svelte";
+  import Bookmarks from "./Bookmarks.svelte";
+  import Mappings from "./Mappings.svelte";
 
   let width = $state(220);
   let draggingHorizontal = $state(false);
-  let tab = $state<"modules" | "search" | "theme">("modules");
+  let tab = $state<
+    "modules" | "search" | "bookmarks" | "mappings" | "theme" | "settings"
+  >("modules");
 </script>
 
 <svelte:window
@@ -25,16 +32,21 @@
   <div id="content">
     {#if tab == "modules"}
       <Modules />{:else if tab == "search"}
-      <Search />{:else if tab == "theme"}
-      <Themes />
+      <Search />{:else if tab == "bookmarks"}
+      <Bookmarks />{:else if tab == "mappings"}
+      <Mappings />{:else if tab == "theme"}
+      <Themes />{:else if tab == "settings"}
+      <Settings />
     {/if}
   </div>
 
   <div id="tabs">
     <CodeIcon onclick={() => (tab = "modules")} size={16} />
     <SearchIcon onclick={() => (tab = "search")} size={16} />
-    <PalleteIcon onclick={() => (tab = "theme")} size={16} />
-    <SettingsIcon onclick={() => alert("Not implemented yet")} size={16} />
+    <BookmarkIcon onclick={() => (tab = "bookmarks")} size={16} />
+    <BookAIcon onclick={() => (tab = "mappings")} size={16} />
+    <PaletteIcon onclick={() => (tab = "theme")} size={16} />
+    <SettingsIcon onclick={() => (tab = "settings")} size={16} />
   </div>
   <div class="resize" onpointerdown={() => (draggingHorizontal = true)}></div>
 </aside>

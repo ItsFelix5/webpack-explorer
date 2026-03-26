@@ -1,287 +1,357 @@
-import { createHighlighterCore, type ThemeRegistration } from "shiki/core";
-import { transformerColorizedBrackets } from "@shikijs/colorized-brackets";
-import { transformerRenderIndentGuides } from "@shikijs/transformers";
-import { writable, derived } from "svelte/store";
-import themes from "./themes";
+import { createHighlighterCore } from "shiki/core";
 import { createOnigurumaEngine } from "shiki";
 import wasm from "shiki/wasm";
+import { EncodedTokenMetadata, INITIAL, Registry } from "shiki/textmate";
+import themes from "./themes";
+import type { ThemeName, Token } from "src/types";
 
-const variable = (name: string) => `var(--${name})`;
-const cssTheme: ThemeRegistration = {
-  name: "variables",
-  type: "dark",
-  colors: {
-    "editor.foreground": variable("foreground"),
-    "editor.background": variable("background"),
-    "terminal.ansiBlack": variable("ansi-black"),
-    "terminal.ansiRed": variable("ansi-red"),
-    "terminal.ansiGreen": variable("ansi-green"),
-    "terminal.ansiYellow": variable("ansi-yellow"),
-    "terminal.ansiBlue": variable("ansi-blue"),
-    "terminal.ansiMagenta": variable("ansi-magenta"),
-    "terminal.ansiCyan": variable("ansi-cyan"),
-    "terminal.ansiWhite": variable("ansi-white"),
-    "terminal.ansiBrightBlack": variable("ansi-bright-black"),
-    "terminal.ansiBrightRed": variable("ansi-bright-red"),
-    "terminal.ansiBrightGreen": variable("ansi-bright-green"),
-    "terminal.ansiBrightYellow": variable("ansi-bright-yellow"),
-    "terminal.ansiBrightBlue": variable("ansi-bright-blue"),
-    "terminal.ansiBrightMagenta": variable("ansi-bright-magenta"),
-    "terminal.ansiBrightCyan": variable("ansi-bright-cyan"),
-    "terminal.ansiBrightWhite": variable("ansi-bright-white"),
-  },
-  tokenColors: [
-    {
-      scope: [
-        "keyword.operator.accessor",
-        "meta.group.braces.round.function.arguments",
-        "meta.template.expression",
-        "markup.fenced_code meta.embedded.block",
-      ],
-      settings: { foreground: variable("foreground") },
-    },
-    {
-      scope: "emphasis",
-      settings: { fontStyle: "italic" },
-    },
-    {
-      scope: ["strong", "markup.heading.markdown", "markup.bold.markdown"],
-      settings: { fontStyle: "bold" },
-    },
-    {
-      scope: ["markup.italic.markdown"],
-      settings: { fontStyle: "italic" },
-    },
-    {
-      scope: "meta.link.inline.markdown",
-      settings: {
-        fontStyle: "underline",
-        foreground: variable("token-link"),
-      },
-    },
-    {
-      scope: ["string", "markup.fenced_code", "markup.inline"],
-      settings: { foreground: variable("token-string") },
-    },
-    {
-      scope: ["comment", "string.quoted.docstring.multi"],
-      settings: { foreground: variable("token-comment") },
-    },
-    {
-      scope: [
-        "constant.numeric",
-        "constant.language",
-        "constant.other.placeholder",
-        "constant.character.format.placeholder",
-        "variable.language.this",
-        "variable.other.object",
-        "variable.other.class",
-        "variable.other.constant",
-        "meta.property-name",
-        "meta.property-value",
-        "support",
-      ],
-      settings: { foreground: variable("token-constant") },
-    },
-    {
-      scope: [
-        "keyword",
-        "storage.modifier",
-        "storage.type",
-        "storage.control.clojure",
-        "entity.name.function.clojure",
-        "entity.name.tag.yaml",
-        "support.function.node",
-        "support.type.property-name.json",
-        "punctuation.separator.key-value",
-        "punctuation.definition.template-expression",
-      ],
-      settings: { foreground: variable("token-keyword") },
-    },
-    {
-      scope: "variable.parameter.function",
-      settings: { foreground: variable("token-parameter") },
-    },
-    {
-      scope: [
-        "support.function",
-        "entity.name.type",
-        "entity.other.inherited-class",
-        "meta.function-call",
-        "meta.instance.constructor",
-        "entity.other.attribute-name",
-        "entity.name.function",
-        "constant.keyword.clojure",
-      ],
-      settings: { foreground: variable("token-function") },
-    },
-    {
-      scope: [
-        "entity.name.tag",
-        "string.quoted",
-        "string.regexp",
-        "string.interpolated",
-        "string.template",
-        "string.unquoted.plain.out.yaml",
-        "keyword.other.template",
-      ],
-      settings: { foreground: variable("token-string-expression") },
-    },
-    {
-      scope: [
-        "punctuation.definition.arguments",
-        "punctuation.definition.dict",
-        "punctuation.separator",
-        "meta.function-call.arguments",
-      ],
-      settings: { foreground: variable("token-punctuation") },
-    },
-    {
-      scope: [
-        "markup.underline.link",
-        "punctuation.definition.metadata.markdown",
-      ],
-      settings: { foreground: variable("token-link") },
-    },
-    {
-      scope: ["beginning.punctuation.definition.list.markdown"],
-      settings: { foreground: variable("token-string") },
-    },
-    {
-      scope: [
-        "punctuation.definition.string.begin.markdown",
-        "punctuation.definition.string.end.markdown",
-        "string.other.link.title.markdown",
-        "string.other.link.description.markdown",
-      ],
-      settings: { foreground: variable("token-keyword") },
-    },
-    {
-      scope: [
-        "markup.inserted",
-        "meta.diff.header.to-file",
-        "punctuation.definition.inserted",
-      ],
-      settings: { foreground: variable("token-inserted") },
-    },
-    {
-      scope: [
-        "markup.deleted",
-        "meta.diff.header.from-file",
-        "punctuation.definition.deleted",
-      ],
-      settings: { foreground: variable("token-deleted") },
-    },
-    {
-      scope: ["markup.changed", "punctuation.definition.changed"],
-      settings: { foreground: variable("token-changed") },
-    },
-  ],
-};
+////////////////////
+// const langs = [import("@shikijs/langs-precompiled/jsx")];
+// const _registry = new Registry(
+//   new Resolver(options.engine, langs),
+//   [],
+//   langs,
+//   options.langAlias,
+// );
+// let _lastTheme;
+// function getLanguage(name) {
+//   const _lang = _registry.getGrammar(
+//     typeof name === "string" ? name : name.name,
+//   );
+//   if (!_lang)
+//     throw new ShikiError(
+//       `Language \`${name}\` not found, you may need to load it first`,
+//     );
+//   return _lang;
+// }
+// function getTheme(name) {
+//   if (name === "none")
+//     return {
+//       bg: "",
+//       fg: "",
+//       name: "none",
+//       settings: [],
+//       type: "dark",
+//     };
 
-const highlighter = await createHighlighterCore({
-  langs: [import("@shikijs/langs/jsx")],
+//   const _theme = _registry.getTheme(name);
+//   if (!_theme)
+//     throw new ShikiError(
+//       `Theme \`${name}\` not found, you may need to load it first`,
+//     );
+//   return _theme;
+// }
+// function setTheme(name) {
+//   const theme = getTheme(name);
+//   if (_lastTheme !== name) {
+//     _registry.setTheme(theme);
+//     _lastTheme = name;
+//   }
+//   return {
+//     theme,
+//     colorMap: _registry.getColorMap(),
+//   };
+// }
+// async function loadTheme(theme) {
+//   _registry.loadTheme(await resolveThemes(theme));
+// }
+//////////////////
+
+export const highlighter = await createHighlighterCore({
+  langs: [import("@shikijs/langs-precompiled/jsx")],
   engine: createOnigurumaEngine(wasm),
-  themes: [cssTheme],
 });
+////////////////
 
-export const theme = writable<keyof typeof themes>();
+// import oniguruma from "vscode-oniguruma";
+// import vsctm from "vscode-textmate";
 
-export async function applyTheme(name: keyof typeof themes) {
-  localStorage.setItem("theme", name);
+// const wasmBin = fs.readFileSync(
+//   path.join(__dirname, "./node_modules/vscode-oniguruma/release/onig.wasm"),
+// ).buffer;
+// const vscodeOnigurumaLib = oniguruma.loadWASM(wasmBin).then(() => {
+//   return {
+//     createOnigScanner(patterns) {
+//       return new oniguruma.OnigScanner(patterns);
+//     },
+//     createOnigString(s) {
+//       return new oniguruma.OnigString(s);
+//     },
+//   };
+// });
 
-  if (!highlighter.getLoadedThemes().includes(name))
-    await highlighter.loadTheme(themes[name].import());
+// // Create a registry that can create a grammar from a scope name.
+// const registry = new vsctm.Registry({
+//   onigLib: vscodeOnigurumaLib,
+//   loadGrammar: (scopeName) => {
+//     if (scopeName === "source.js") {
+//       // https://github.com/textmate/javascript.tmbundle/blob/master/Syntaxes/JavaScript.plist
+//       return readFile("./JavaScript.plist").then((data) =>
+//         vsctm.parseRawGrammar(data.toString()),
+//       );
+//     }
+//     console.log(`Unknown scope name: ${scopeName}`);
+//     return null;
+//   },
+// });
 
-  theme.set(name);
-  Object.entries(highlighter.getTheme(name).colors!).forEach(([key, value]) =>
-    document.documentElement.style.setProperty(
-      "--" + key.replaceAll(".", "-"),
-      value,
-    ),
-  );
-}
-applyTheme(
-  (localStorage.getItem("theme") as keyof typeof themes) || "one-dark-pro",
+//
+const bracketPairs = [
+  {
+    opener: "[",
+    closer: "]",
+  },
+  {
+    opener: "{",
+    closer: "}",
+  },
+  {
+    opener: "(",
+    closer: ")",
+  },
+  {
+    opener: "<",
+    closer: ">",
+    scopesAllowList: [
+      "punctuation.definition.typeparameters.begin.ts",
+      "punctuation.definition.typeparameters.end.ts",
+      "entity.name.type.instance.jsdoc",
+    ],
+  },
+];
+const bracketsRegExp = new RegExp(
+  bracketPairs
+    .flatMap((pair) => [pair.opener, pair.closer])
+    .sort((a, b) => b.length - a.length)
+    .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|"),
+  "g",
 );
 
-export const tokens = (code: string) => {
-  const result = highlighter.codeToTokens(code, {
-    lang: "jsx",
-    theme: "variables",
-  });
-  return result;
-};
+export function tokenize(code: string, theme: ThemeName, array: Token[][]) {
+  const { colorMap } = highlighter.setTheme(theme);
+  const { bracketColors } = themes[theme];
+  const grammar = highlighter.getLanguage("jsx");
 
-export const highlight = derived(theme, ($theme) => {
-  if (!$theme) return () => "No theme :(";
-  return (code: string, tokenMap?: Map<number, string>) =>
-    highlighter.codeToHtml(code, {
-      lang: "jsx",
-      theme: $theme,
-      transformers: [
-        transformerColorizedBrackets(),
-        transformerRenderIndentGuides(),
-        {
-          name: "split",
-          tokens(tokens) {
-            for (const line of tokens) {
-              for (let i = 0; i < line.length; i++) {
-                const token = line[i];
-                if (typeof token.content === "string") {
-                  const m = token.content.match(/^(\s+)([\s\S]+)$/);
-                  if (m) {
-                    line.splice(
-                      i,
-                      1,
-                      { content: m[1], offset: token.offset },
-                      {
-                        ...token,
-                        content: m[2],
-                        offset: token.offset + m[1].length,
-                      },
-                    );
-                    i++;
-                  }
-                }
-              }
-            }
-            return tokens;
-          },
-        },
-        {
-          name: "refmap",
-          tokens(tokens) {
-            for (const line of tokens) {
-              for (const token of line) {
-                token.htmlAttrs ??= {};
-                token.htmlAttrs["data-offset"] = String(token.offset);
-                if (tokenMap?.has(token.offset))
-                  token.htmlAttrs["data-ref-id"] = tokenMap.get(token.offset)!;
-              }
-            }
-            return tokens;
-          },
-        },
-        {
-          name: "modules",
-          tokens(tokens) {
-            for (const line of tokens) {
-              for (let i = 2; i < line.length - 1; i++) {
-                if (
-                  line[i - 2].content == "require" &&
-                  line[i - 1].content == "(" &&
-                  line[i + 1].content == ")"
-                ) {
-                  const value = parseInt(line[i].content);
-                  if (!isNaN(value))
-                    line[i].htmlAttrs!["data-module-id"] = String(value);
-                }
-              }
-            }
-            return tokens;
-          },
-        },
-      ],
-    });
-});
+  const openerStack: Token[] = [];
+  const parts = code.split(/(\r?\n)/g);
+  let lineOffset = 0;
+  let stateStack = INITIAL;
+  for (let i = 0; i < parts.length; i += 2) {
+    lineOffset += parts[i - 2]?.length || 0;
+    lineOffset += parts[i - 1]?.length || 0;
+    const line = parts[i];
+    if (line === "") {
+      array.push([]);
+      continue;
+    }
+
+    let startOfLine = true;
+    let lineTokens = [];
+    const scopes = grammar.tokenizeLine(line, stateStack, 500).tokens;
+    const result = grammar.tokenizeLine2(line, stateStack, 500);
+    const tokensLength = result.tokens.length / 2;
+    for (let j = 0; j < tokensLength; j++) {
+      let startIndex = result.tokens[2 * j];
+      const nextStartIndex =
+        j + 1 < tokensLength ? result.tokens[2 * j + 2] : line.length;
+      if (startIndex === nextStartIndex) continue;
+      const metadata = result.tokens[2 * j + 1];
+
+      const fontStyle = EncodedTokenMetadata.getFontStyle(metadata);
+      let style = "";
+      if (fontStyle & 1) style += "font-style: italic;";
+      if (fontStyle & 2) style += "font-weight: bold;";
+      if (fontStyle & 4 || fontStyle & 8) {
+        style += "text-decoration: ";
+        if (fontStyle & 4) style += "underline ";
+        if (fontStyle & 8) style += "line-through";
+        style += ";";
+      }
+      let content = line.substring(startIndex, nextStartIndex);
+      while (content.startsWith(" ")) {
+        let length = startOfLine
+          ? content.startsWith("  ")
+            ? 2
+            : 1
+          : content.match(/^ +/)![0].length;
+        lineTokens.push({
+          content: content.substring(0, length),
+          offset: lineOffset + startIndex,
+          color: colorMap[EncodedTokenMetadata.getForeground(metadata)],
+          htmlAttrs: { class: startOfLine ? "indent" : undefined },
+        });
+        startIndex += length;
+        content = content.substring(length);
+      }
+      startOfLine = false;
+
+      if (content.length) {
+        const explanations = scopes
+          .filter(
+            (scopeToken) =>
+              scopeToken.endIndex > startIndex &&
+              scopeToken.startIndex < nextStartIndex,
+          )
+          .map((scopeToken) => ({
+            content: line.substring(
+              Math.max(scopeToken.startIndex, startIndex),
+              Math.min(scopeToken.endIndex, nextStartIndex),
+            ),
+            scopes: scopeToken.scopes,
+          }));
+
+        const offset = lineOffset + startIndex;
+
+        let trailing = content;
+        content = content.trimEnd();
+        trailing = trailing.substring(content.length);
+
+        const t = {
+          content,
+          offset,
+          color: colorMap[EncodedTokenMetadata.getForeground(metadata)],
+          htmlAttrs: { style },
+          explanation: explanations,
+        };
+
+        if (shouldIgnoreToken(t)) {
+          lineTokens.push(t);
+          if (trailing)
+            lineTokens.push({
+              content: trailing,
+              offset: offset + content.length,
+              color: "",
+              htmlAttrs: {},
+            });
+          continue;
+        }
+
+        const tokens: Token[] = [];
+
+        let last = 0,
+          m: RegExpExecArray | null;
+
+        while ((m = bracketsRegExp.exec(content))) {
+          if (m.index > last)
+            tokens.push({
+              ...t,
+              content: content.slice(last, m.index),
+              offset: offset + last,
+            });
+
+          tokens.push({ ...t, content: m[0], offset: offset + m.index });
+          last = m.index + m[0].length;
+        }
+
+        if (last < content.length)
+          tokens.push({
+            ...t,
+            content: content.slice(last),
+            offset: offset + last,
+          });
+
+        const lead = content.match(/^\s*/)?.[0].length ?? 0;
+        const trail = content.match(/\s*$/)?.[0].length ?? 0;
+
+        let cur = 0;
+        const ranges = explanations.map((e, i) => {
+          let len = e.content.length;
+
+          if (explanations.length === 1) len = content.length;
+          else if (i === 0) len = lead + e.content.trimStart().length;
+          else if (i === explanations.length - 1)
+            len = e.content.trimEnd().length + trail;
+
+          const start = cur,
+            end = start + len - 1;
+          cur += len;
+          return { start, end };
+        });
+
+        for (const t of tokens) {
+          const start = t.offset - offset;
+          const end = start + t.content.length - 1;
+
+          t.explanation = ranges
+            .map((r, i) => [r, explanations[i]] as const)
+            .filter(([r]) => !(end < r.start || r.end < start))
+            .map(([, exp]) => exp);
+          lineTokens.push(t);
+          if (trailing)
+            lineTokens.push({
+              content: trailing,
+              offset: offset + content.length,
+              color: "",
+              htmlAttrs: {},
+            });
+          const pairDefinition = bracketPairs.find(
+            (pair) =>
+              pair.opener === t.content.trim() ||
+              pair.closer === t.content.trim(),
+          );
+
+          if (
+            !pairDefinition ||
+            shouldIgnoreToken(t, pairDefinition.scopesAllowList)
+          )
+            continue;
+
+          if (
+            bracketPairs.map((pair) => pair.opener).includes(t.content.trim())
+          )
+            openerStack.push(t);
+          else if (
+            bracketPairs.map((pair) => pair.closer).includes(t.content.trim())
+          ) {
+            const openerContent = bracketPairs.find(
+              (pair) => pair.closer == t.content.trim(),
+            )?.opener;
+            const opener = openerStack
+              .toReversed()
+              .find((t) => t.content.trim() === openerContent);
+            if (opener) {
+              while (openerStack.at(-1) !== opener)
+                if (openerStack.pop()) t.color = bracketColors.at(-1)!;
+
+              openerStack.pop();
+              opener.color = t.color =
+                bracketColors[openerStack.length % (bracketColors.length - 1)];
+            } else t.color = bracketColors.at(-1)!;
+          }
+        }
+      }
+    }
+    array.push(lineTokens);
+    stateStack = result.ruleStack;
+  }
+
+  for (const token of openerStack) token.color = bracketColors.at(-1)!;
+}
+
+function shouldIgnoreToken(token: Token, scopesAllowList?: string[]): boolean {
+  if (!token.explanation) return true;
+
+  const embeddedLastIndex =
+    token.explanation[0].scopes.findLastIndex(
+      (scope) =>
+        scope.startsWith("meta.embedded.") ||
+        scope.startsWith("scope.embedded.") ||
+        scope === "entity.name.type.instance.jsdoc" ||
+        scope === "variable.other.jsdoc",
+    ) ?? -1;
+  return !!(
+    (token.explanation[0].scopes.findLastIndex(
+      (scope) => scope.startsWith("comment.") || scope.startsWith("string."),
+    ) ?? -1) > embeddedLastIndex ||
+    (scopesAllowList &&
+      scopesAllowList.length &&
+      !token.explanation.some((explanation) =>
+        explanation.scopes.some((scope) =>
+          scopesAllowList.some(
+            (allowed) => scope === allowed || scope.startsWith(`${allowed}.`),
+          ),
+        ),
+      ))
+  );
+}

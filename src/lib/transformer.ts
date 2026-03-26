@@ -3,10 +3,6 @@ import traverse from "@babel/traverse";
 import * as t from "@babel/types";
 import type { Scope } from "@babel/traverse";
 
-const moduleNameMap: Record<number, string> = {
-  0xbad225b5: "React",
-};
-
 export function transform(ast: ParseResult) {
   if (ast.program.body.length !== 1) throw "Expected exactly 1 statement";
   const node = ast.program.body[0];
@@ -101,9 +97,7 @@ export function transform(ast: ParseResult) {
               callee.name == "require" &&
               t.isNumericLiteral(path.node.init.arguments[0])
             )
-              hint =
-                moduleNameMap[path.node.init.arguments[0].value] ||
-                "mod_" + path.node.init.arguments[0].value;
+              hint = "mod_" + path.node.init.arguments[0].value;
             else hint = callee.name.toLowerCase();
           } else if (
             t.isMemberExpression(callee) &&
@@ -140,6 +134,39 @@ export function transform(ast: ParseResult) {
 
         path.scope.rename(path.node.id.name, newName);
       }
+    },
+
+    // Rename restructureing variables
+    ObjectProperty(path) {
+      const { node, scope } = path;
+
+      if (
+        node.computed ||
+        node.shorthand ||
+        !t.isIdentifier(node.key) ||
+        !t.isIdentifier(node.value)
+      )
+        return;
+
+      const keyName = node.key.name;
+      const valueName = node.value.name;
+
+      if (keyName === valueName) {
+        node.shorthand = true;
+        return;
+      }
+
+      const binding = scope.getBinding(valueName);
+      if (!binding) return;
+
+      let newName = keyName;
+      if (!t.isValidIdentifier(newName)) newName = "_" + newName;
+
+      if (scope.hasBinding(newName) || scope.hasGlobal(newName)) return;
+
+      scope.rename(valueName, newName);
+      node.value = t.identifier(newName);
+      node.shorthand = true;
     },
 
     // Transform React.createElement calls to JSX
@@ -221,6 +248,18 @@ export function transform(ast: ParseResult) {
           children.length === 0,
         ),
       );
+    },
+
+    // Remove comma operator in return statements
+    ReturnStatement(path) {
+      const arg = path.node.argument;
+      if (!arg || !t.isSequenceExpression(arg) || arg.expressions.length < 2)
+        return;
+
+      path.replaceWithMultiple([
+        ...arg.expressions.slice(0, -1).map((e) => t.expressionStatement(e)),
+        t.returnStatement(arg.expressions[arg.expressions.length - 1]),
+      ]);
     },
   });
 

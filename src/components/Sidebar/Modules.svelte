@@ -2,24 +2,13 @@
   import { Package, PackageOpen } from "@lucide/svelte";
   import { files } from "../../lib/data";
   import { getContext } from "svelte";
+  import type { App } from "src/types";
 
-  let ctx: { openModule: number | undefined; rewrite: boolean } =
-    getContext("app");
+  let ctx: App = getContext("app");
 
   let expanded = $state<string[]>([]);
-  let history = $state<number[]>([]);
   let draggingVertical = $state(false);
   let height = $state(220);
-
-  $effect(() => {
-    if (ctx.openModule !== undefined) {
-      if (history.length === 0 || history[0] !== ctx.openModule)
-        history = [
-          ctx.openModule,
-          ...history.filter((x) => x !== ctx.openModule),
-        ].slice(0, 20);
-    }
-  });
 </script>
 
 <svelte:window
@@ -52,15 +41,13 @@
       {file[0]}
     </button>
     {#if expanded.includes(file[0])}
-      {#each Object.keys(file[1]) as unknown as number[] as module}
+      {#each Object.keys(file[1]).map((m) => Number(m)) as module}
         <button
           class="sidebar-item"
           onclick={() => (ctx.openModule = module)}
-          style:background-color={ctx.openModule == module
-            ? "var(--editor-selectionBackground)"
-            : "transparent"}
+          class:selected={ctx.openModule == module}
         >
-          {module}
+          {ctx.mappings[module]?.[-1] || module}
         </button>
       {/each}
     {/if}
@@ -71,13 +58,11 @@
   <div class="resize" onpointerdown={() => (draggingVertical = true)}></div>
   <div class="header">Recent</div>
   <div class="recent-list">
-    {#each history as module}
+    {#each ctx.history as module}
       <button
         class="sidebar-item"
         onclick={() => (ctx.openModule = module)}
-        style:background-color={ctx.openModule == module
-          ? "var(--editor-selectionBackground)"
-          : "transparent"}
+        class:selected={ctx.openModule == module}
       >
         {module}
       </button>
