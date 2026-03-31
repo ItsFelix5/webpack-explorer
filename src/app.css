@@ -17,10 +17,6 @@ body {
   display: flex;
 }
 
-::selection {
-  background-color: var(--editor-selectionBackground);
-}
-
 .highlighted,
 .highlighted-hover {
   border-color: var(--editor-selectionHighlightBorder);
@@ -85,7 +81,9 @@ button {
   width: calc(100% - 16px);
 }
 
-.selected {
+::selection,
+.selected,
+.button:hover {
   background-color: var(--editor-selectionBackground);
   border-radius: 4px;
 }

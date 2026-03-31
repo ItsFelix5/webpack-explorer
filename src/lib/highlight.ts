@@ -278,13 +278,6 @@ export function tokenize(code: string, theme: ThemeName, array: Token[][]) {
             .filter(([r]) => !(end < r.start || r.end < start))
             .map(([, exp]) => exp);
           lineTokens.push(t);
-          if (trailing)
-            lineTokens.push({
-              content: trailing,
-              offset: offset + content.length,
-              color: "",
-              htmlAttrs: {},
-            });
           const pairDefinition = bracketPairs.find(
             (pair) =>
               pair.opener === t.content.trim() ||
@@ -320,6 +313,13 @@ export function tokenize(code: string, theme: ThemeName, array: Token[][]) {
             } else t.color = bracketColors.at(-1)!;
           }
         }
+        if (trailing)
+          lineTokens.push({
+            content: trailing,
+            offset: offset + content.length,
+            color: "",
+            htmlAttrs: {},
+          });
       }
     }
     array.push(lineTokens);

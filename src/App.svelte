@@ -15,7 +15,6 @@
     theme: (localStorage.getItem("theme") as ThemeName) || "one-dark-pro",
     mappings: JSON.parse(localStorage.getItem("mappings") ?? "{}"),
     bookmarks: JSON.parse(localStorage.getItem("bookmarks") ?? "{}"),
-    highlighted: undefined,
   });
   if (isNaN(ctx.openModule!)) ctx.openModule = undefined;
   $effect(() => localStorage.setItem("open", ctx.openModule?.toString() || ""));
@@ -29,6 +28,8 @@
         .filter((x, i) => ctx.history.indexOf(x) == i)
         .slice(0, 20);
     }
+    ctx.highlighted = undefined;
+    ctx.hovered = undefined;
     localStorage.setItem("history", JSON.stringify(ctx.history));
   });
   $effect(() => {
@@ -52,7 +53,7 @@
   );
 
   setContext("app", ctx);
-  window.app = ctx;
+  (window as any).ctx = ctx;
 </script>
 
 <Sidebar />

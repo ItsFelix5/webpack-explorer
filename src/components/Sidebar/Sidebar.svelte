@@ -6,6 +6,7 @@
     BookAIcon,
     PaletteIcon,
     SettingsIcon,
+    AsteriskIcon,
   } from "@lucide/svelte";
   import Modules from "./Modules.svelte";
   import Search from "./Search.svelte";
@@ -13,11 +14,18 @@
   import Settings from "./Settings.svelte";
   import Bookmarks from "./Bookmarks.svelte";
   import Mappings from "./Mappings.svelte";
+  import References from "./References.svelte";
 
   let width = $state(220);
   let draggingHorizontal = $state(false);
   let tab = $state<
-    "modules" | "search" | "bookmarks" | "mappings" | "theme" | "settings"
+    | "modules"
+    | "search"
+    | "references"
+    | "bookmarks"
+    | "mappings"
+    | "theme"
+    | "settings"
   >("modules");
 </script>
 
@@ -32,7 +40,8 @@
   <div id="content">
     {#if tab == "modules"}
       <Modules />{:else if tab == "search"}
-      <Search />{:else if tab == "bookmarks"}
+      <Search />{:else if tab == "references"}
+      <References />{:else if tab == "bookmarks"}
       <Bookmarks />{:else if tab == "mappings"}
       <Mappings />{:else if tab == "theme"}
       <Themes />{:else if tab == "settings"}
@@ -41,12 +50,21 @@
   </div>
 
   <div id="tabs">
-    <CodeIcon onclick={() => (tab = "modules")} size={16} />
-    <SearchIcon onclick={() => (tab = "search")} size={16} />
-    <BookmarkIcon onclick={() => (tab = "bookmarks")} size={16} />
-    <BookAIcon onclick={() => (tab = "mappings")} size={16} />
-    <PaletteIcon onclick={() => (tab = "theme")} size={16} />
-    <SettingsIcon onclick={() => (tab = "settings")} size={16} />
+    <CodeIcon class="button" onclick={() => (tab = "modules")} size={16} />
+    <SearchIcon class="button" onclick={() => (tab = "search")} size={16} />
+    <AsteriskIcon
+      class="button"
+      onclick={() => (tab = "references")}
+      size={16}
+    />
+    <BookmarkIcon
+      class="button"
+      onclick={() => (tab = "bookmarks")}
+      size={16}
+    />
+    <BookAIcon class="button" onclick={() => (tab = "mappings")} size={16} />
+    <PaletteIcon class="button" onclick={() => (tab = "theme")} size={16} />
+    <SettingsIcon class="button" onclick={() => (tab = "settings")} size={16} />
   </div>
   <div class="resize" onpointerdown={() => (draggingHorizontal = true)}></div>
 </aside>

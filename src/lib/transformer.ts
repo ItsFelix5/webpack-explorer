@@ -89,6 +89,7 @@ export function transform(ast: ParseResult) {
         let hint = "val";
         if (
           t.isCallExpression(path.node.init) ||
+          t.isOptionalCallExpression(path.node.init) ||
           t.isNewExpression(path.node.init)
         ) {
           const callee = path.node.init.callee;
@@ -106,7 +107,10 @@ export function transform(ast: ParseResult) {
           ) {
             hint = callee.property.name.toLowerCase();
           }
-        } else if (t.isMemberExpression(path.node.init)) {
+        } else if (
+          t.isMemberExpression(path.node.init) ||
+          t.isOptionalMemberExpression(path.node.init)
+        ) {
           if (t.isIdentifier(path.node.init.property))
             hint = path.node.init.property.name.toLowerCase();
           else hint = "prop";
@@ -136,7 +140,7 @@ export function transform(ast: ParseResult) {
       }
     },
 
-    // Rename restructureing variables
+    // Rename restructuring variables
     ObjectProperty(path) {
       const { node, scope } = path;
 
@@ -250,16 +254,17 @@ export function transform(ast: ParseResult) {
       );
     },
 
-    // Remove comma operator in return statements
-    ReturnStatement(path) {
-      const arg = path.node.argument;
-      if (!arg || !t.isSequenceExpression(arg) || arg.expressions.length < 2)
-        return;
-
-      path.replaceWithMultiple([
-        ...arg.expressions.slice(0, -1).map((e) => t.expressionStatement(e)),
-        t.returnStatement(arg.expressions[arg.expressions.length - 1]),
-      ]);
+    // Seperate chained instructions
+    SequenceExpression({ node, parentPath }) {
+      if (parentPath.isReturnStatement({ argument: node }))
+        parentPath.replaceWithMultiple([
+          ...node.expressions.slice(0, -1).map((e) => t.expressionStatement(e)),
+          t.returnStatement(node.expressions[node.expressions.length - 1]),
+        ]);
+      else if (parentPath.isExpressionStatement())
+        parentPath.replaceWithMultiple(
+          node.expressions.map((e) => t.expressionStatement(e)),
+        );
     },
   });
 
