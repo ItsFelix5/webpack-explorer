@@ -179,7 +179,6 @@ export function transform(ast: ParseResult) {
 
       if (
         !t.isMemberExpression(callee) ||
-        !t.isIdentifier(callee.object, { name: "React" }) ||
         !t.isIdentifier(callee.property, { name: "createElement" })
       )
         return;

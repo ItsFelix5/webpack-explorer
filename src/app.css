@@ -4,15 +4,15 @@
 
 * {
   margin: 0;
+  font-family: "Consolas", "Cascadia Code", "Fira Mono", "Menlo", monospace;
 }
 
 body {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: var(--editor-background, #1e1e1e);
+  background-color: var(--editor-background, #1e1e1e);
   color: var(--editor-foreground);
-  font-family: "Consolas", "Cascadia Code", "Fira Mono", "Menlo", monospace;
   font-size: 13px;
   display: flex;
 }
@@ -66,6 +66,7 @@ body.ctrl .module:hover {
   border-bottom: 1px solid var(--panel-border);
   flex: 0 0 auto;
   user-select: none;
+  text-transform: capitalize;
 }
 
 button {
@@ -79,6 +80,10 @@ button {
   text-align: left;
   margin: 0px 8px 0px 8px;
   width: calc(100% - 16px);
+}
+
+.button {
+  padding: 1px;
 }
 
 ::selection,
@@ -144,4 +149,8 @@ pre {
 
 svg {
   vertical-align: middle;
+}
+
+.hint {
+  padding: 10px;
 }

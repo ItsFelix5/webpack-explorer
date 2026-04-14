@@ -23,7 +23,6 @@
 />
 
 <div class="modules">
-  <div class="header">Modules</div>
   {#each Object.entries(files) as file}
     <button
       style="margin: 5px 0 0 0;"

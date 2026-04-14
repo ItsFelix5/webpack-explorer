@@ -3,7 +3,7 @@
   import { transform } from "../lib/transformer";
   import { getContext, untrack } from "svelte";
   import { tokenize } from "../lib/highlight";
-  import type { App, Token } from "src/types";
+  import type { App } from "src/types";
   import { getReferences } from "../lib/references";
   import Line from "./Line.svelte";
 

@@ -1,5 +1,6 @@
 import { parse, type ParseResult } from "@babel/parser";
 import generate from "@babel/generator";
+import type { Search } from "src/types";
 
 export let files: Record<string, Record<number, string>> = {
   "client-boot": {
@@ -59,4 +60,27 @@ export async function toCode(ast: ParseResult) {
   return ((generate as any).default as typeof generate)(ast, {
     jsescOption: { minimal: true },
   }).code;
+}
+
+export function searchRegex(search: Search) {
+  let query = search.query;
+  if (!search.regex) query = query.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (search.wholeWord) query = `\\b${query}\\b`;
+  return new RegExp(query, search.caseSensitive ? "i" : "");
+}
+
+export function search(search: Search) {
+  const regex = searchRegex(search);
+  let chunkFilter = isNaN(parseInt(search.filter));
+  return Object.entries(files)
+    .filter(
+      (file) =>
+        search.filter == "" || !chunkFilter || file[0].includes(search.filter),
+    )
+    .flatMap((file) => Object.entries(file[1]))
+    .filter(
+      (fn) =>
+        (chunkFilter || fn[0].includes(search.filter)) && fn[1].match(regex),
+    )
+    .map((fn) => Number(fn[0]));
 }

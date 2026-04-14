@@ -14,8 +14,6 @@
   );
 </script>
 
-<div class="header">References</div>
-
 {#if ctx.highlighted}
   <div class="references">
     {#each lines as i}
@@ -30,7 +28,7 @@
     {/each}
   </div>
 {:else}
-  Select a variable to view its references
+  <span class="hint">Select a variable to view its references</span>
 {/if}
 
 <style>

@@ -2,11 +2,11 @@
   import {
     CodeIcon,
     SearchIcon,
+    AsteriskIcon,
     BookmarkIcon,
     BookAIcon,
     PaletteIcon,
     SettingsIcon,
-    AsteriskIcon,
   } from "@lucide/svelte";
   import Modules from "./Modules.svelte";
   import Search from "./Search.svelte";
@@ -16,17 +16,19 @@
   import Mappings from "./Mappings.svelte";
   import References from "./References.svelte";
 
+  const tabs = {
+    modules: CodeIcon,
+    search: SearchIcon,
+    references: AsteriskIcon,
+    bookmarks: BookmarkIcon,
+    mappings: BookAIcon,
+    theme: PaletteIcon,
+    settings: SettingsIcon,
+  };
+
   let width = $state(220);
   let draggingHorizontal = $state(false);
-  let tab = $state<
-    | "modules"
-    | "search"
-    | "references"
-    | "bookmarks"
-    | "mappings"
-    | "theme"
-    | "settings"
-  >("modules");
+  let tab = $state<keyof typeof tabs>("modules");
 </script>
 
 <svelte:window
@@ -38,6 +40,7 @@
 
 <aside style:width={width + "px"}>
   <div id="content">
+    <div class="header">{tab}</div>
     {#if tab == "modules"}
       <Modules />{:else if tab == "search"}
       <Search />{:else if tab == "references"}
@@ -50,21 +53,13 @@
   </div>
 
   <div id="tabs">
-    <CodeIcon class="button" onclick={() => (tab = "modules")} size={16} />
-    <SearchIcon class="button" onclick={() => (tab = "search")} size={16} />
-    <AsteriskIcon
-      class="button"
-      onclick={() => (tab = "references")}
-      size={16}
-    />
-    <BookmarkIcon
-      class="button"
-      onclick={() => (tab = "bookmarks")}
-      size={16}
-    />
-    <BookAIcon class="button" onclick={() => (tab = "mappings")} size={16} />
-    <PaletteIcon class="button" onclick={() => (tab = "theme")} size={16} />
-    <SettingsIcon class="button" onclick={() => (tab = "settings")} size={16} />
+    {#each Object.entries(tabs) as [id, Icon]}
+      <Icon
+        class={"button" + (tab == id ? " selected" : "")}
+        onclick={() => (tab = id as typeof tab)}
+        size={16}
+      />
+    {/each}
   </div>
   <div class="resize" onpointerdown={() => (draggingHorizontal = true)}></div>
 </aside>

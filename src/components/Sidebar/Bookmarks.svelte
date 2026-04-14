@@ -2,6 +2,7 @@
   import { Bookmark, Package, PackageOpen } from "@lucide/svelte";
   import { files } from "../../lib/data";
   import { getContext } from "svelte";
+  import { flip } from "svelte/animate";
   import type { App } from "src/types";
 
   let ctx: App = getContext("app");
@@ -9,9 +10,8 @@
   let expanded = $state<(string | number)[]>([]);
 </script>
 
-<div class="modules">
-  <div class="header">Bookmarks</div>
-  {#each Object.entries(files).filter( ([_, mods]) => Object.keys(mods).some((m) => ctx.bookmarks[Number(m)]), ) as file}
+{#if Object.entries(files).some( ([_, mods]) => Object.keys(mods).some((m) => ctx.bookmarks[Number(m)]?.length), )}
+  {#each Object.entries(files).filter( ([_, mods]) => Object.keys(mods).some((m) => ctx.bookmarks[Number(m)]?.length), ) as file}
     <button
       style="margin: 5px 0 0 0;"
       class="sidebar-item"
@@ -28,7 +28,9 @@
       {file[0]}
     </button>
     {#if expanded.includes(file[0])}
-      {#each Object.keys(file[1]).filter((m) => ctx.bookmarks[m]) as unknown as number[] as module}
+      {#each Object.keys(file[1])
+        .map((s) => Number(s))
+        .filter((m) => ctx.bookmarks[m]?.length) as module}
         <button
           class="sidebar-item"
           onclick={() =>
@@ -41,9 +43,10 @@
         </button>
         <div style:padding-left="8px">
           {#if expanded.includes(module)}
-            {#each ctx.bookmarks[module].toSorted((a, b) => a - b) as bookmark, i}
+            {#each ctx.bookmarks[module].toSorted((a, b) => a - b) as bookmark, i (bookmark)}
               <button
                 class="sidebar-item"
+                animate:flip
                 onclick={() => {
                   ctx.openModule = module;
 
@@ -70,4 +73,8 @@
       {/each}
     {/if}
   {/each}
-</div>
+{:else}
+  <span class="hint"
+    >No bookmarks yet. Create one by clicking the line number</span
+  >
+{/if}

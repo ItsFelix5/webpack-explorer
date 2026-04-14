@@ -9,8 +9,7 @@
   let expanded = $state<(string | number)[]>([]);
 </script>
 
-<div class="modules">
-  <div class="header">Mappings</div>
+{#if Object.values(files).some( (mods) => Object.keys(mods).some((m) => ctx.mappings[Number(m)]), )}
   {#each Object.entries(files).filter( ([_, mods]) => Object.keys(mods).some((m) => ctx.mappings[Number(m)]), ) as file}
     <button
       style="margin: 5px 0 0 0;"
@@ -28,7 +27,9 @@
       {file[0]}
     </button>
     {#if expanded.includes(file[0])}
-      {#each Object.keys(file[1]).filter((m) => ctx.mappings[m]) as unknown as number[] as module}
+      {#each Object.keys(file[1])
+        .map((m) => Number(m))
+        .filter((m) => ctx.mappings[m]) as module}
         <button
           class="sidebar-item"
           onclick={() =>
@@ -78,4 +79,6 @@
       {/each}
     {/if}
   {/each}
-</div>
+{:else}
+  <span class="hint">Select a variable and press F2 to rename it</span>
+{/if}

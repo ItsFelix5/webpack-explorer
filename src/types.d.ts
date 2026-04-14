@@ -29,4 +29,13 @@ export type App = {
     usages: Map<number, number[]>;
   };
   tokens: Token[][];
+  search: Search;
+};
+
+export type Search = {
+  query: string;
+  filter: string;
+  wholeWord: boolean;
+  caseSensitive: boolean;
+  regex: boolean;
 };
