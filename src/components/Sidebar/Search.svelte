@@ -30,7 +30,7 @@
   autofocus
 />
 
-<span style="padding: 4px 8px; border-top: 1px solid var(--panel-border);">
+<div class="filter-row">
   <input
     type="text"
     placeholder="Filter modules"
@@ -52,7 +52,7 @@
     onclick={() => (ctx.search.regex = !ctx.search.regex)}
     size={16}
   />
-</span>
+</div>
 
 {#if ctx.search.query && ctx.search.query.length >= 2}
   {@const results = search(ctx.search)}
@@ -82,16 +82,30 @@
     padding: 6px 8px;
     background: transparent;
     border: none;
-    color: var(--editor-foreground);
+    color: var(--text);
     font-size: 12px;
     outline: none;
     box-sizing: border-box;
   }
 
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-top: 1px solid var(--border);
+  }
+
   .filter {
+    flex: 1;
+    min-width: 0;
     border: none;
     border-radius: 4px;
-    background-color: var(--badge-background);
-    color: var(--editor-foreground);
+    background-color: var(--bg);
+    color: var(--text);
+  }
+
+  .button {
+    flex-shrink: 0;
   }
 </style>

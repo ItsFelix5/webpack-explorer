@@ -3,11 +3,9 @@
   import Sidebar from "./components/Sidebar/Sidebar.svelte";
   import Editor from "./components/Editor.svelte";
   import { setContext } from "svelte";
-  import { highlighter } from "./lib/highlight";
-  import themes from "./lib/themes";
   import type { App, ThemeName } from "./types";
 
-  let ready = $state(false);
+  let ready = $state(true);
   let ctx = $state<App>({
     openModule: parseInt(localStorage.getItem("open") || ""),
     history: JSON.parse(localStorage.getItem("history") ?? "[]"),
@@ -42,18 +40,6 @@
   });
   $effect(() => {
     localStorage.setItem("theme", ctx.theme);
-    highlighter
-      .loadTheme(themes[ctx.theme as keyof typeof themes].import())
-      .then(() =>
-        Object.entries(highlighter.getTheme(ctx.theme).colors!).forEach(
-          ([key, value]) =>
-            document.documentElement.style.setProperty(
-              "--" + key.replaceAll(".", "-"),
-              value,
-            ),
-        ),
-      )
-      .then(() => (ready = true));
   });
   $effect(() => localStorage.setItem("mappings", JSON.stringify(ctx.mappings)));
   $effect(() =>
@@ -89,7 +75,6 @@
     justify-content: center;
     flex: 1;
     gap: 12px;
-    color: var(--descriptionForeground);
     font-size: 13px;
     user-select: none;
   }

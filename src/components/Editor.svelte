@@ -16,19 +16,19 @@
       ctx.highlighted = undefined;
       ctx.tokens = [];
       console.time("tokenize");
-      if (ctx.rewrite) {
-        getAST(ctx.openModule!)
-          .then((ast) => transform(ast))
-          .then((ast) => toCode(ast))
-          .then((code) => {
+      getAST(ctx.openModule!)
+        .then(async (ast) => {
+          if (ctx.rewrite) {
+            const transformed = transform(ast);
+            tokenize(getCode(ctx.openModule!), transformed, ctx.tokens);
+
+            const code = await toCode(transformed);
             ctx.references = getReferences(code);
-            tokenize(code, ctx.theme, ctx.tokens);
-          })
-          .then(() => console.timeEnd("tokenize"));
-      } else {
-        tokenize(getCode(ctx.openModule!), ctx.theme, ctx.tokens);
-        console.timeEnd("tokenize");
-      }
+          } else {
+            tokenize(getCode(ctx.openModule!), ast, ctx.tokens);
+          }
+        })
+        .then(() => console.timeEnd("tokenize"));
     });
   });
 </script>

@@ -67,7 +67,7 @@
 <style>
   aside {
     position: relative;
-    background: var(--sideBar-background);
+    background-color: var(--bg-dark);
     height: 100vh;
     width: auto;
     display: flex;
@@ -88,7 +88,7 @@
     align-items: center;
     padding: 4px 8px 6px 8px;
     height: 20px;
-    border-top: 1px solid var(--panel-border);
+    border-top: 1px solid var(--border);
   }
 
   .resize {
@@ -102,6 +102,6 @@
 
   .resize:hover,
   .resize:active {
-    background: var(--button-background);
+    background: var(--accent);
   }
 </style>

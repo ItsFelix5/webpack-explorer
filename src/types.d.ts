@@ -3,12 +3,18 @@ import type themes from "./lib/themes";
 export type Token = {
   content: string;
   offset: number;
-  color: string;
-  htmlAttrs: Record<string, string | undefined>;
-  explanation?: {
-    content: string;
-    scopes: string[];
-  }[];
+  type:
+    | "comment"
+    | "string"
+    | "number"
+    | "boolean"
+    | "keyword"
+    | "function"
+    | "variable"
+    | "constant"
+    | "operator"
+    | "property"
+    | "indent";
 };
 
 export type ThemeName = keyof typeof themes;

@@ -91,7 +91,7 @@
 
   .resize:hover,
   .resize:active {
-    background: var(--button-background);
+    background: var(--accent);
   }
 
   .modules {
@@ -131,7 +131,7 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: var(--panel-border);
+    background: var(--border);
   }
 
   .sources-indicator {
@@ -140,7 +140,7 @@
     left: 0;
     height: 1px;
     width: 50%;
-    background: var(--button-background);
+    background: var(--accent);
     transform: translateX(0);
     transition:
       transform 220ms ease-in,
@@ -154,7 +154,7 @@
 
   .sources button {
     font-size: 10px;
-    color: var(--descriptionForeground);
+    color: var(--text);
     padding: 4px 6px;
     border-radius: 0;
     background: transparent;
@@ -168,7 +168,7 @@
   }
 
   .sources button.active {
-    color: var(--editor-foreground);
+    color: var(--text);
     font-weight: 700;
   }
 </style>

@@ -3,6 +3,7 @@
   import type { App, Token } from "src/types";
   import { Bookmark } from "@lucide/svelte";
   import { searchRegex } from "../lib/data";
+  import themes from "../lib/themes";
 
   let ctx: App = getContext("app");
   let {
@@ -10,6 +11,12 @@
     i,
     interactive = true,
   }: { line: Token[]; i: number; interactive?: boolean } = $props();
+
+  const bracketColors = themes[ctx.theme]?.bracketColors ?? ["#d19a66", "#c678dd", "#56b6c2", "#f78c6c"];
+
+  function getBracketColor(depth: number): string {
+    return bracketColors[depth % bracketColors.length];
+  }
 </script>
 
 <div class="line">
@@ -34,10 +41,10 @@
       }}
       fill={ctx.bookmarks[ctx.openModule!]?.includes(i)
         ? "var(--bookmark)"
-        : "var(--editor-background)"}
+        : "var(--bg)"}
       color={ctx.bookmarks[ctx.openModule!]?.includes(i)
         ? "var(--bookmark)"
-        : "var(--editorLineNumber-foreground)"}
+        : "var(--text-muted)"}
     /></span
   >{#each line as token, i (token)}{@const reference =
       ctx.references!.tokenMap.get(token.offset)}{@const module =
@@ -48,12 +55,12 @@
       line[i + 1].content == ")"
         ? parseInt(token.content)
         : NaN}<span
-      {...token.htmlAttrs}
+      class={token.type}
       class:highlighted={reference != undefined && ctx.highlighted == reference}
       class:highlighted-hover={reference != undefined &&
         ctx.hovered == reference}
       class:module={!isNaN(module)}
-      style:color={token.color}
+      style:color={token.bracketDepth != undefined ? getBracketColor(token.bracketDepth) : undefined}
       data-offset={token.offset}
       data-definition={ctx.references!.definitions.get(token.offset)}
       onclick={(e) => {
@@ -76,11 +83,10 @@
 
 <style>
   .highlight-line {
-    color: var(--editor-foreground);
+    color: var(--text);
   }
 
   .highlight {
-    border: 1px var(--editor-findMatchBorder);
-    background-color: var(--editor-findMatchBackground);
+    background-color: var(--highlight);
   }
 </style>
