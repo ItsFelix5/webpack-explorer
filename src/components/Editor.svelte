@@ -20,10 +20,9 @@
         .then(async (ast) => {
           if (ctx.rewrite) {
             const transformed = transform(ast);
-            tokenize(getCode(ctx.openModule!), transformed, ctx.tokens);
-
             const code = await toCode(transformed);
             ctx.references = getReferences(code);
+            tokenize(getCode(ctx.openModule!), transformed, ctx.tokens);
           } else {
             tokenize(getCode(ctx.openModule!), ast, ctx.tokens);
           }

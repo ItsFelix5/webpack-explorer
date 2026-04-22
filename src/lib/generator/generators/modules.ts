@@ -8,7 +8,7 @@ import {
   isStatement,
 } from "@babel/types";
 import type * as t from "@babel/types";
-import { TokenContext } from "../node/index";
+import { TokenContext } from "../node";
 import { _shouldPrintDecoratorsBeforeExport } from "./expressions";
 
 export function ImportSpecifier(this: Printer, node: t.ImportSpecifier) {
@@ -78,13 +78,11 @@ export function _printAttributes(
   this.word("with");
   this.space();
 
-  const occurrenceCount = hasPreviousBrace ? 1 : 0;
-
-  this.token("{", undefined, occurrenceCount);
+  this.token("{", undefined);
   this.space();
-  this.printList(attributes, this.shouldPrintTrailingComma("}"));
+  this.printList(attributes);
   this.space();
-  this.token("}", undefined, occurrenceCount);
+  this.token("}", undefined);
 }
 
 export function ExportAllDeclaration(
@@ -172,7 +170,7 @@ export function ExportNamedDeclaration(
       this.token("{");
       if (specifiers.length) {
         this.space();
-        this.printList(specifiers, this.shouldPrintTrailingComma("}"));
+        this.printList(specifiers);
         this.space();
       }
       this.token("}");
@@ -253,7 +251,7 @@ export function ImportDeclaration(this: Printer, node: t.ImportDeclaration) {
     hasBrace = true;
     this.token("{");
     this.space();
-    this.printList(specifiers, this.shouldPrintTrailingComma("}"));
+    this.printList(specifiers);
     this.space();
     this.token("}");
   } else if (isTypeKind && !hasSpecifiers) {
@@ -304,15 +302,11 @@ export function ImportExpression(this: Printer, node: t.ImportExpression) {
     this.word(node.phase);
   }
   this.token("(");
-  const shouldPrintTrailingComma = this.shouldPrintTrailingComma(")");
   this.print(node.source);
   if (node.options != null) {
     this.token(",");
     this.space();
     this.print(node.options);
-  }
-  if (shouldPrintTrailingComma) {
-    this.token(",");
   }
   this.rightParens(node);
 }

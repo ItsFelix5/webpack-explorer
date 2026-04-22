@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
 
-import Buffer from "./buffer";
-import type { Loc, Pos } from "./buffer";
-import { isLastChild, parentNeedsParens } from "./node/index";
-import { generatorInfosMap } from "./nodes";
+import {
+  isLastChild,
+  parentNeedsParens,
+  __node,
+  generatorInfosMap,
+} from "./node";
 import type * as t from "@babel/types";
 import {
   isExpression,
@@ -12,20 +14,13 @@ import {
   isClassBody,
   isTSInterfaceBody,
   isTSEnumMember,
+  type SourceLocation,
 } from "@babel/types";
-import type { Opts as jsescOptions } from "jsesc";
 
-import { TokenMap } from "./token-map";
-
-import type { GeneratorOptions } from "./index.ts";
-import type SourceMap from "./source-map.ts";
-import type { TraceMap } from "@jridgewell/trace-mapping";
+import { type GenMapping, maybeAddMapping } from "@jridgewell/gen-mapping";
 import type { Token } from "@babel/parser";
+import type { Token as OutputToken } from "../../types";
 
-import * as charCodes from "./charcodes";
-
-const SCIENTIFIC_NOTATION = /e/i;
-const ZERO_DECIMAL_INTEGER = /\.0+$/;
 const HAS_NEWLINE = /[\n\r\u2028\u2029]/;
 const HAS_NEWLINE_OR_BlOCK_COMMENT_END = /[\n\r\u2028\u2029]|\*\//;
 
@@ -33,8 +28,7 @@ function commentIsNewline(c: t.Comment) {
   return c.type === "CommentLine" || HAS_NEWLINE.test(c.value);
 }
 
-import { TokenContext } from "./node/index.ts";
-import { _getRawIdentifier } from "./generators/types.ts";
+import { TokenContext } from "./node";
 
 const enum COMMENT_TYPE {
   LEADING,
@@ -53,16 +47,6 @@ const enum PRINT_COMMENT_HINT {
   SKIP,
   ALLOW,
   DEFER,
-}
-
-const enum PRINTER_FLAGS {
-  EMPTY = 0,
-  PRESERVE_FORMAT = 1 << 0,
-  COMPACT = 1 << 1,
-  CONCISE = 1 << 2,
-  RETAIN_LINES = 1 << 3,
-  RETAIN_FUNCTION_PARENS = 1 << 4,
-  AUX_COMMENTS = 1 << 5,
 }
 
 const enum LAST_CHAR_KINDS {
@@ -87,90 +71,22 @@ const enum PRINT_COMMENTS_RESULT {
   PRINTED_ALL = 2,
 }
 
-export type Format = {
-  shouldPrintComment: (comment: string) => boolean;
-  preserveFormat: boolean | undefined;
-  retainLines: boolean | undefined;
-  retainFunctionParens: boolean | undefined;
-  comments: boolean | undefined;
-  auxiliaryCommentBefore: string | undefined;
-  auxiliaryCommentAfter: string | undefined;
-  compact: boolean | "auto" | undefined;
-  minified: boolean | undefined;
-  concise: boolean | undefined;
-  indent: {
-    adjustMultilineComment: boolean;
-    style: string;
-  };
-  jsescOption: jsescOptions;
-  /**
-   * For use with the Hack-style pipe operator.
-   * Changes what token is used for pipe bodies’ topic references.
-   */
-  topicToken?: GeneratorOptions["topicToken"];
-};
-
-interface PrintSequenceOptions {
-  statement?: boolean;
-  indent?: boolean;
-  trailingCommentsLineOffset?: number;
-}
-
 interface PrintListOptions {
-  separator?: (this: Printer, occurrenceCount: number, last: boolean) => void;
+  separator?: (this: Printer, last: boolean) => void;
   statement?: boolean;
   indent?: boolean;
   printTrailingSeparator?: boolean;
 }
 
-export type PrintJoinOptions = PrintListOptions & PrintSequenceOptions;
+export type PrintJoinOptions = PrintListOptions & {
+  statement?: boolean;
+  indent?: boolean;
+  trailingCommentsLineOffset?: number;
+};
 class Printer {
-  constructor(
-    format: Format,
-    map: SourceMap | null,
-    tokens: Token[] | null = null,
-    originalCode: string | null = null,
-  ) {
-    this.format = format;
-
-    this._tokens = tokens;
-    this._originalCode = originalCode;
-
-    this._indentRepeat = format.indent.style.length;
-
-    this._inputMap = map?._inputMap || null;
-
-    this._buf = new Buffer(map, format.indent.style[0]);
-
-    const {
-      preserveFormat,
-      compact,
-      concise,
-      retainLines,
-      retainFunctionParens,
-    } = format;
-    if (preserveFormat) {
-      this._flags |= PRINTER_FLAGS.PRESERVE_FORMAT;
-    }
-    if (compact) {
-      this._flags |= PRINTER_FLAGS.COMPACT;
-    }
-    if (concise) {
-      this._flags |= PRINTER_FLAGS.CONCISE;
-    }
-    if (retainLines) {
-      this._flags |= PRINTER_FLAGS.RETAIN_LINES;
-    }
-    if (retainFunctionParens) {
-      this._flags |= PRINTER_FLAGS.RETAIN_FUNCTION_PARENS;
-    }
-    if (format.auxiliaryCommentBefore || format.auxiliaryCommentAfter) {
-      this._flags |= PRINTER_FLAGS.AUX_COMMENTS;
-    }
+  constructor(map: GenMapping | null) {
+    this._map = map;
   }
-  declare _inputMap: TraceMap | null;
-
-  declare format: Format;
 
   enterDelimited() {
     const oldNoLineTerminatorAfterNode = this._noLineTerminatorAfterNode;
@@ -182,110 +98,63 @@ class Printer {
 
   tokenContext: number = TokenContext.normal;
 
-  _tokens: Token[] | null = null;
-  _originalCode: string | null = null;
-
-  declare _buf: Buffer;
   _currentNode: t.Node | null = null;
   _currentTypeId: number | null = null;
   _indent: number = 0;
-  _indentRepeat: number = 0;
-  _insideAux: boolean = false;
   _noLineTerminator: boolean = false;
   _noLineTerminatorAfterNode: t.Node | null = null;
-  _printAuxAfterOnNextUserNode: boolean = false;
   _printedComments = new Set<t.Comment>();
   _lastCommentLine = 0;
   _innerCommentsState = INNER_COMMENTS_STATE.DISALLOWED;
-  _flags = PRINTER_FLAGS.EMPTY;
 
-  tokenMap: TokenMap | null = null;
+  _map: GenMapping | null = null;
+  _str = "";
+  _tokens: OutputToken[][] = [];
+  _offset = 0;
+  _last = 0;
+  _canMarkIdName = true;
+  _queuedChar: 32 | 59 | 0 = 0;
 
-  _boundGetRawIdentifier: ((node: t.Identifier) => string) | null = null;
-
-  generate(ast: t.Node) {
-    if (this.format.preserveFormat) {
-      this.tokenMap = new TokenMap(ast, this._tokens!, this._originalCode!);
-      this._boundGetRawIdentifier = _getRawIdentifier.bind(this);
-    }
-    this.print(ast);
-    this._maybeAddAuxComment();
-
-    return this._buf.get();
-  }
+  _position = {
+    line: 1,
+    column: 0,
+  };
+  _sourcePosition: {
+    identifierName: string | undefined;
+    line: number | undefined;
+    column: number | undefined;
+  } = {
+    identifierName: undefined,
+    line: undefined,
+    column: undefined,
+  };
 
   /**
    * Increment indent size.
    */
-
-  indent(flags = this._flags): void {
-    if (
-      flags &
-      (PRINTER_FLAGS.PRESERVE_FORMAT |
-        PRINTER_FLAGS.COMPACT |
-        PRINTER_FLAGS.CONCISE)
-    ) {
-      return;
-    }
-
-    this._indent += this._indentRepeat;
+  indent(): void {
+    this._indent += 2;
   }
 
   /**
    * Decrement indent size.
    */
-
-  dedent(flags = this._flags): void {
-    if (
-      flags &
-      (PRINTER_FLAGS.PRESERVE_FORMAT |
-        PRINTER_FLAGS.COMPACT |
-        PRINTER_FLAGS.CONCISE)
-    ) {
-      return;
-    }
-
-    this._indent -= this._indentRepeat;
+  dedent(): void {
+    this._indent -= 2;
   }
-
-  /**
-   * If the next token is on the same line, we must first print a semicolon.
-   * This option is only used in `preserveFormat` node, for semicolons that
-   * might have omitted due to them being absent in the original code (thanks
-   * to ASI).
-   *
-   * We need both *NextToken and *NextNode because we only want to insert the
-   * semicolon when the next token starts a new node, and not in cases like
-   * foo} (where } is not starting a new node). So we first set *NextNode, and
-   * then the print() method will move it to *NextToken.
-   */
-  _printSemicolonBeforeNextNode: number = -1;
-  _printSemicolonBeforeNextToken: number = -1;
 
   /**
    * Add a semicolon to the buffer.
    */
   semicolon(force: boolean = false): void {
-    const flags = this._flags;
-    if (flags & PRINTER_FLAGS.AUX_COMMENTS) {
-      this._maybeAddAuxComment();
-    }
-    if (flags & PRINTER_FLAGS.PRESERVE_FORMAT) {
-      const node = this._currentNode!;
-      if (node.start != null && node.end != null) {
-        if (!this.tokenMap!.endMatches(node, ";")) {
-          // no semicolon
-          this._printSemicolonBeforeNextNode = this._buf.getCurrentLine();
-          return;
-        }
-        const indexes = this.tokenMap!.getIndexes(this._currentNode!)!;
-        this._catchUpTo(this._tokens![indexes[indexes.length - 1]].loc.start);
-      }
-    }
     if (force) {
-      this._appendChar(charCodes.semicolon);
+      this._maybeIndent();
+      this._flush();
+      this._appendChar(59, "punctuation");
     } else {
-      this._queue(charCodes.semicolon);
+      this._flush();
+      this._queuedChar = 59;
+      this.setLastChar(-1);
     }
     this._noLineTerminator = false;
   }
@@ -295,9 +164,6 @@ class Printer {
    */
 
   rightBrace(node: t.Node): void {
-    if (this.format.minified) {
-      this._buf.removeLastSemicolon();
-    }
     this.sourceWithOffset("end", node.loc, -1);
     this.token("}");
   }
@@ -310,41 +176,25 @@ class Printer {
   /**
    * Add a space to the buffer unless it is compact.
    */
-
   space(force: boolean = false): void {
-    if (this._flags & (PRINTER_FLAGS.PRESERVE_FORMAT | PRINTER_FLAGS.COMPACT)) {
-      return;
-    }
-
-    if (force) {
-      this._space();
-    } else {
+    if (force) this._space();
+    else {
       const lastCp = this.getLastChar(true);
-      if (
-        lastCp !== 0 &&
-        lastCp !== charCodes.space &&
-        lastCp !== charCodes.lineFeed
-      ) {
-        this._space();
-      }
+      if (lastCp !== 0 && lastCp !== 32 && lastCp !== 10) this._space();
     }
   }
 
   /**
    * Writes a token that can't be safely parsed without taking whitespace into account.
    */
-
-  word(str: string, noLineTerminatorAfter: boolean = false): void {
+  word(
+    str: string,
+    type: OutputToken["type"] = "keyword",
+    noLineTerminatorAfter: boolean = false,
+  ): void {
     this.tokenContext &= TokenContext.forInOrInitHeadAccumulatePassThroughMask;
 
-    this._maybePrintInnerComments(str);
-
-    const flags = this._flags;
-    if (flags & PRINTER_FLAGS.AUX_COMMENTS) {
-      this._maybeAddAuxComment();
-    }
-
-    if (flags & PRINTER_FLAGS.PRESERVE_FORMAT) this._catchUpToCurrentToken(str);
+    this._maybePrintInnerComments();
 
     const lastChar = this.getLastChar();
 
@@ -352,45 +202,13 @@ class Printer {
       lastChar === LAST_CHAR_KINDS.INTEGER ||
       lastChar === LAST_CHAR_KINDS.WORD ||
       // prevent concatenating words and creating // comment out of division and regex
-      (lastChar === charCodes.slash && str.charCodeAt(0) === charCodes.slash)
-    ) {
+      (lastChar === 47 && str.charCodeAt(0) === 47)
+    )
       this._space();
-    }
-    this._append(str, false);
+    this._append(str, type, false);
 
     this.setLastChar(-3);
     this._noLineTerminator = noLineTerminatorAfter;
-  }
-
-  /**
-   * Writes a number token so that we can validate if it is an integer.
-   */
-
-  number(str: string, number?: number): void {
-    // const NON_DECIMAL_LITERAL = /^0[box]/;
-    function isNonDecimalLiteral(str: string) {
-      if (str.length > 2 && str.charCodeAt(0) === charCodes.digit0) {
-        const secondChar = str.charCodeAt(1);
-        return (
-          secondChar === charCodes.lowercaseB ||
-          secondChar === charCodes.lowercaseO ||
-          secondChar === charCodes.lowercaseX
-        );
-      }
-      return false;
-    }
-    this.word(str);
-
-    // Integer tokens need special handling because they cannot have '.'s inserted immediately after them.
-    if (
-      Number.isInteger(number) &&
-      !isNonDecimalLiteral(str) &&
-      !SCIENTIFIC_NOTATION.test(str) &&
-      !ZERO_DECIMAL_INTEGER.test(str) &&
-      str.charCodeAt(str.length - 1) !== charCodes.dot
-    ) {
-      this.setLastChar(LAST_CHAR_KINDS.INTEGER);
-    }
   }
 
   /**
@@ -399,84 +217,56 @@ class Printer {
    * @param str The string to append.
    * @param [maybeNewline=false] Whether `str` might potentially
    *    contain a line terminator or not.
-   * @param [occurrenceCount=0] The occurrence count of this token in
-   *    the current node. This is used when printing in `preserveFormat` mode,
-   *    to know which token we should map to (for example, to disambiguate the
-   *    commas in an array literal).
    * @param [mayNeedSpace=false] Check whether a whitespace might be
    *    needed after this token, and if so, add a whitespace after it.
    */
   token(
     str: string,
+    type: OutputToken["type"] = "",
     maybeNewline = false,
-    occurrenceCount = 0,
     mayNeedSpace: boolean = false,
   ): void {
     this.tokenContext &= TokenContext.forInOrInitHeadAccumulatePassThroughMask;
 
-    this._maybePrintInnerComments(str, occurrenceCount);
-
-    const flags = this._flags;
-
-    if (flags & PRINTER_FLAGS.AUX_COMMENTS) {
-      this._maybeAddAuxComment();
-    }
-
-    if (flags & PRINTER_FLAGS.PRESERVE_FORMAT) {
-      this._catchUpToCurrentToken(str, occurrenceCount);
-    }
+    this._maybePrintInnerComments();
 
     if (mayNeedSpace) {
       const strFirst = str.charCodeAt(0);
       if (
         // space is mandatory to avoid outputting <!--
         // http://javascript.spec.whatwg.org/#comment-syntax
-        (((strFirst === charCodes.dash && str === "--") ||
+        (((strFirst === 45 && str === "--") ||
           // Needs spaces to avoid changing a! == 0 to a!== 0
-          strFirst === charCodes.equalsTo) &&
-          this.getLastChar() === charCodes.exclamationMark) ||
+          strFirst === 61) &&
+          this.getLastChar() === 33) ||
         // Need spaces for operators of the same kind to avoid: `a+++b`
-        (strFirst === charCodes.plusSign &&
-          this.getLastChar() === charCodes.plusSign) ||
-        (strFirst === charCodes.dash &&
-          this.getLastChar() === charCodes.dash) ||
+        (strFirst === 43 && this.getLastChar() === 43) ||
+        (strFirst === 45 && this.getLastChar() === 45) ||
         // Needs spaces to avoid changing '34' to '34.', which would still be a valid number.
-        (strFirst === charCodes.dot &&
-          this.getLastChar() === LAST_CHAR_KINDS.INTEGER)
-      ) {
+        (strFirst === 46 && this.getLastChar() === LAST_CHAR_KINDS.INTEGER)
+      )
         this._space();
-      }
     }
-    this._append(str, maybeNewline);
+    this._append(str, type, maybeNewline);
     this._noLineTerminator = false;
   }
 
-  tokenChar(char: number, occurrenceCount = 0): void {
+  tokenChar(char: number, type: OutputToken["type"]): void {
     this.tokenContext &= TokenContext.forInOrInitHeadAccumulatePassThroughMask;
 
-    this._maybePrintInnerComments(char, occurrenceCount);
-
-    const flags = this._flags;
-
-    if (flags & PRINTER_FLAGS.AUX_COMMENTS) {
-      this._maybeAddAuxComment();
-    }
-
-    if (flags & PRINTER_FLAGS.PRESERVE_FORMAT) {
-      this._catchUpToCurrentToken(char, occurrenceCount);
-    }
+    this._maybePrintInnerComments();
 
     if (
       // Need spaces for operators of the same kind to avoid: `a+++b`
-      (char === charCodes.plusSign &&
-        this.getLastChar() === charCodes.plusSign) ||
-      (char === charCodes.dash && this.getLastChar() === charCodes.dash) ||
+      (char === 43 && this.getLastChar() === 43) ||
+      (char === 45 && this.getLastChar() === 45) ||
       // Needs spaces to avoid changing '34' to '34.', which would still be a valid number.
-      (char === charCodes.dot && this.getLastChar() === LAST_CHAR_KINDS.INTEGER)
-    ) {
+      (char === 46 && this.getLastChar() === LAST_CHAR_KINDS.INTEGER)
+    )
       this._space();
-    }
-    this._appendChar(char);
+    this._maybeIndent();
+    this._flush();
+    this._appendChar(char, type);
     this._noLineTerminator = false;
   }
 
@@ -486,25 +276,13 @@ class Printer {
    * It currently has some limitations.
    * @see {Buffer#getNewlineCount}
    */
-  newline(i: number = 1, flags = this._flags): void {
+  newline(i: number = 1): void {
     if (i <= 0) return;
-
-    if (flags & (PRINTER_FLAGS.RETAIN_LINES | PRINTER_FLAGS.COMPACT)) {
-      return;
-    }
-
-    if (flags & PRINTER_FLAGS.CONCISE) {
-      this.space();
-      return;
-    }
-
     if (i > 2) i = 2; // Max two lines
 
-    i -= this._buf.getNewlineCount();
+    i -= this._queuedChar === 0 && this._last === 10 ? 1 : 0;
 
-    for (let j = 0; j < i; j++) {
-      this._newline();
-    }
+    for (let j = 0; j < i; j++) this._newline();
   }
 
   endsWith(char: number): boolean {
@@ -512,187 +290,212 @@ class Printer {
   }
 
   getLastChar(checkQueue?: boolean): number {
-    return this._buf.getLastChar(checkQueue);
+    if (!checkQueue) return this._last;
+    return this._queuedChar !== 0 ? this._queuedChar : this._last;
   }
 
   setLastChar(char: number) {
-    this._buf._last = char;
+    this._last = char;
   }
 
-  exactSource(loc: Loc | null | undefined, cb: () => void) {
-    if (!loc) {
-      cb();
-      return;
-    }
+  source(prop: "start" | "end", loc: SourceLocation | undefined): void {
+    if (!loc || !this._map) return;
 
-    this._catchUp("start", loc);
-
-    this._buf.exactSource(loc, cb);
-  }
-
-  source(prop: "start" | "end", loc: Loc | undefined): void {
-    if (!loc) return;
-
-    this._catchUp(prop, loc);
-
-    this._buf.source(prop, loc);
+    this._normalizePosition(prop, loc, 0);
   }
 
   sourceWithOffset(
     prop: "start" | "end",
-    loc: Loc | null | undefined,
+    loc: SourceLocation | null | undefined,
     columnOffset: number,
   ): void {
-    if (!loc || this.format.preserveFormat) return;
+    if (!loc) return;
 
-    this._catchUp(prop, loc);
-
-    this._buf.sourceWithOffset(prop, loc, columnOffset);
+    if (!this._map) return;
+    this._normalizePosition(prop, loc, columnOffset);
   }
 
-  sourceIdentifierName(identifierName: string, pos?: Pos): void {
-    if (!this._buf._canMarkIdName) return;
+  _normalizePosition(
+    prop: "start" | "end",
+    loc: SourceLocation,
+    columnOffset: number,
+  ) {
+    this._flush();
 
-    const sourcePosition = this._buf._sourcePosition;
-    sourcePosition.identifierNamePos = pos;
+    if (loc[prop]) {
+      this._sourcePosition.line = loc[prop].line;
+      this._sourcePosition.column = Math.max(
+        loc[prop].column + columnOffset,
+        0,
+      );
+    }
+  }
+
+  sourceIdentifierName(
+    identifierName: string,
+    pos?: SourceLocation["start"],
+  ): void {
+    if (!this._canMarkIdName) return;
+
+    const sourcePosition = this._sourcePosition;
     sourcePosition.identifierName = identifierName;
   }
 
   _space(): void {
-    this._queue(charCodes.space);
+    this._flush();
+    this._queuedChar = 32;
+    this.setLastChar(-1);
   }
 
   _newline(): void {
     // Drop trailing spaces when a newline is inserted.
-    if (this._buf._queuedChar === charCodes.space) this._buf._queuedChar = 0;
-
-    this._appendChar(charCodes.lineFeed, true);
+    if (this._queuedChar === 32) this._queuedChar = 0;
+    this._flush();
+    this._appendChar(10, "");
   }
 
-  _catchUpToCurrentToken(
-    str: string | number,
-    occurrenceCount: number = 0,
-  ): void {
-    // Assert: this.tokenMap
-
-    const token = this.tokenMap!.findMatching(
-      this._currentNode!,
-      str,
-      occurrenceCount,
-    );
-    if (token) this._catchUpTo(token.loc.start);
-
-    if (
-      this._printSemicolonBeforeNextToken !== -1 &&
-      this._printSemicolonBeforeNextToken === this._buf.getCurrentLine()
-    ) {
-      this._appendChar(charCodes.semicolon, true);
-    }
-    this._printSemicolonBeforeNextToken = -1;
-    this._printSemicolonBeforeNextNode = -1;
-  }
-
-  _append(str: string, maybeNewline: boolean): void {
+  _append(str: string, type: OutputToken["type"], maybeNewline: boolean): void {
     this._maybeIndent();
+    this._flush();
+    const len = str.length;
+    const position = this._position;
+    const sourcePos = this._sourcePosition;
 
-    this._buf.append(str, maybeNewline);
-  }
+    this._last = -1;
 
-  _appendChar(char: number, noIndent?: boolean): void {
-    if (!noIndent) {
-      this._maybeIndent();
+    while (this._tokens.length - 1 < position.line) this._tokens.push([]);
+    this._tokens[position.line - 1].push({
+      content: str,
+      offset: this._offset,
+      type,
+    });
+
+    this._str += str;
+    this._offset += len;
+
+    if (!maybeNewline && !this._map) {
+      position.column += len;
+      return;
     }
 
-    this._buf.appendChar(char);
+    const { column, identifierName } = sourcePos;
+    let line = sourcePos.line;
+
+    if (identifierName != null && this._canMarkIdName) {
+      sourcePos.identifierName = undefined;
+    }
+
+    let i = str.indexOf("\n");
+    let last = 0;
+
+    // If the string starts with a newline char, then adding a mark is redundant.
+    // This catches both "no newlines" and "newline after several chars".
+    if (this._map && i !== 0) {
+      this.mark(position, line, column, identifierName);
+    }
+
+    // Now, find each remaining newline char in the string.
+    while (i !== -1) {
+      position.line++;
+      position.column = 0;
+      last = i + 1;
+
+      // We mark the start of each line, which happens directly after this newline char
+      // unless this is the last char.
+      // When manually adding multi-line content (such as a comment), `line` will be `undefined`.
+      if (last < len && line !== undefined) {
+        line++;
+        if (this._map) {
+          maybeAddMapping(this._map, {
+            generated: position,
+            source: "",
+            original: {
+              line,
+              column: 0,
+            },
+          });
+        }
+      }
+      i = str.indexOf("\n", last);
+    }
+    position.column += len - last;
   }
 
-  _queue(char: typeof charCodes.space | typeof charCodes.semicolon): void {
-    this._buf.queue(char);
+  _flush(): void {
+    const queuedChar = this._queuedChar;
+    if (queuedChar !== 0) {
+      this._appendChar(queuedChar, "");
+      this._queuedChar = 0;
+    }
+  }
 
-    this.setLastChar(-1);
+  _appendChar(
+    char: number,
+    type: OutputToken["type"],
+    repeat: number = 1,
+    useSourcePos: boolean = true,
+  ): void {
+    this._last = char;
+
+    let str = char === -1 ? " " : String.fromCharCode(char);
+    if (repeat > 1) str = str.repeat(repeat);
+
+    const position = this._position;
+    if (char !== 10) {
+      if (this._map) {
+        const sourcePos = this._sourcePosition;
+        if (useSourcePos && sourcePos?.line && sourcePos?.column) {
+          if (char === 32 || !sourcePos.identifierName)
+            maybeAddMapping(this._map, {
+              generated: position,
+              source: "",
+              original: {
+                line: sourcePos.line,
+                column: sourcePos.column,
+              },
+            });
+          else
+            maybeAddMapping(this._map, {
+              name: sourcePos.identifierName,
+              generated: position,
+              source: "",
+              original: {
+                line: sourcePos.line,
+                column: sourcePos.column,
+              },
+            });
+        } else
+          maybeAddMapping(this._map, {
+            generated: position,
+          });
+
+        if (useSourcePos && sourcePos && char !== 32 && this._canMarkIdName)
+          sourcePos.identifierName = undefined;
+      }
+
+      position.column += repeat;
+    } else {
+      position.line++;
+      position.column = 0;
+    }
+
+    while (this._tokens.length - 1 < position.line) this._tokens.push([]);
+    if (str != "\n")
+      this._tokens[position.line - 1].push({
+        content: str,
+        offset: this._offset,
+        type,
+      });
+
+    this._str += str;
+    this._offset += repeat;
+    this._position.column += repeat;
   }
 
   _maybeIndent(): void {
-    const indent = this._shouldIndent();
-    if (indent > 0) {
-      this._buf._appendChar(-1, indent, false);
-    }
-  }
-
-  _shouldIndent() {
-    // we've got a newline before us so prepend on the indentation
-    return this.endsWith(charCodes.lineFeed) ? this._indent : 0;
-  }
-
-  catchUp(line: number) {
-    if (!this.format.retainLines) return;
-
-    // catch up to this nodes newline if we're behind
-    const count = line - this._buf.getCurrentLine();
-
-    for (let i = 0; i < count; i++) {
-      this._newline();
-    }
-  }
-
-  _catchUp(prop: "start" | "end", loc?: Loc) {
-    const flags = this._flags;
-    if ((flags & PRINTER_FLAGS.PRESERVE_FORMAT) === 0) {
-      if (flags & PRINTER_FLAGS.RETAIN_LINES && loc?.[prop]) {
-        this.catchUp(loc[prop].line);
-      }
-      return;
-    }
-
-    // catch up to this nodes newline if we're behind
-    const pos = loc?.[prop];
-    if (pos != null) this._catchUpTo(pos);
-  }
-
-  _catchUpTo({ line, column, index }: Pos) {
-    const count = line - this._buf.getCurrentLine();
-    if (count > 0 && this._noLineTerminator) {
-      // We cannot inject new lines when _noLineTemrinator is set
-      // to `true`, or we would generate invalid code.
-      return;
-    }
-
-    for (let i = 0; i < count; i++) {
-      this._newline();
-    }
-
-    const spacesCount =
-      count > 0 ? column : column - this._buf.getCurrentColumn();
-    if (spacesCount > 0) {
-      const spaces = this._originalCode
-        ? this._originalCode
-            .slice(index - spacesCount, index)
-            // https://tc39.es/ecma262/#sec-white-space
-            .replace(/[^\t\v\f\uFEFF\p{Space_Separator}]/gu, " ")
-        : " ".repeat(spacesCount);
-      this._append(spaces, false);
-      this.setLastChar(charCodes.space);
-    }
-  }
-
-  printTerminatorless(node: t.Node) {
-    /**
-     * Set some state that will be modified if a newline has been inserted before any
-     * non-space characters.
-     *
-     * This is to prevent breaking semantics for terminatorless separator nodes. eg:
-     *
-     *   return foo;
-     *
-     * returns `foo`. But if we do:
-     *
-     *   return
-     *   foo;
-     *
-     *  `undefined` will be returned and not `foo` due to the terminator.
-     */
-    this._noLineTerminator = true;
-    this.print(node);
+    const indent = this.endsWith(10) ? this._indent : 0;
+    for (let i = 0; i < indent; i += 2)
+      this._appendChar(-1, "indent", 2, false);
   }
 
   print(
@@ -702,6 +505,7 @@ class Printer {
     // trailingCommentsLineOffset also used to check if called from printJoin
     // it will be ignored if `noLineTerminatorAfter||this._noLineTerminator`
     trailingCommentsLineOffset?: number,
+    typeFallback?: OutputToken["type"],
   ) {
     if (!node) return;
 
@@ -709,24 +513,13 @@ class Printer {
 
     const { type, loc, extra } = node;
 
-    const flags = this._flags;
-    let changedFlags = false;
-    if (
-      // @ts-expect-error document _compact AST properties
-      node._compact
-    ) {
-      this._flags |= PRINTER_FLAGS.CONCISE;
-      changedFlags = true;
-    }
-
     const nodeInfo = generatorInfosMap.get(type);
-    if (nodeInfo === undefined) {
+    if (nodeInfo === undefined)
       throw new ReferenceError(
         `unknown node of type ${JSON.stringify(
           type,
         )} with constructor ${JSON.stringify(node.constructor.name)}`,
       );
-    }
 
     const [printMethod, nodeId, needsParens] = nodeInfo;
 
@@ -735,46 +528,21 @@ class Printer {
     this._currentNode = node;
     this._currentTypeId = nodeId;
 
-    if (flags & PRINTER_FLAGS.PRESERVE_FORMAT) {
-      this._printSemicolonBeforeNextToken = this._printSemicolonBeforeNextNode;
-    }
-
-    let oldInAux;
-    if (flags & PRINTER_FLAGS.AUX_COMMENTS) {
-      oldInAux = this._insideAux;
-      this._insideAux = loc == null;
-      this._maybeAddAuxComment(this._insideAux && !oldInAux);
-    }
-
     let oldTokenContext = 0;
     if (resetTokenContext) {
       oldTokenContext = this.tokenContext;
-      if (oldTokenContext & TokenContext.forInOrInitHeadAccumulate) {
+      if (oldTokenContext & TokenContext.forInOrInitHeadAccumulate)
         this.tokenContext = 0;
-      } else {
-        oldTokenContext = 0;
-      }
+      else oldTokenContext = 0;
     }
 
     const parenthesized =
       extra != null && (extra.parenthesized as boolean | undefined);
     let shouldPrintParens =
-      (parenthesized && flags & PRINTER_FLAGS.PRESERVE_FORMAT) ||
-      (parenthesized &&
-        flags & PRINTER_FLAGS.RETAIN_FUNCTION_PARENS &&
-        nodeId === __node("FunctionExpression")) ||
-      (parent &&
-        (parentNeedsParens(node, parent, parentId!) ||
-          (needsParens != null &&
-            needsParens(
-              node,
-              parent,
-              parentId!,
-              this.tokenContext,
-              flags & PRINTER_FLAGS.PRESERVE_FORMAT
-                ? this._boundGetRawIdentifier!
-                : undefined,
-            ))));
+      parent &&
+      (parentNeedsParens(node, parent, parentId!) ||
+        (needsParens != null &&
+          needsParens(node, parent, parentId!, this.tokenContext, undefined)));
 
     if (
       !shouldPrintParens &&
@@ -803,10 +571,7 @@ class Printer {
     if (
       !shouldPrintParens &&
       this._noLineTerminator &&
-      (node.leadingComments?.some(commentIsNewline) ||
-        (flags & PRINTER_FLAGS.RETAIN_LINES &&
-          loc &&
-          loc.start.line > this._buf.getCurrentLine()))
+      node.leadingComments?.some(commentIsNewline)
     ) {
       shouldPrintParens = true;
       indentParenthesized = true;
@@ -832,22 +597,26 @@ class Printer {
       this.token("(");
       if (indentParenthesized) this.indent();
       this._innerCommentsState = INNER_COMMENTS_STATE.DISALLOWED;
-      if (!resetTokenContext) {
-        oldTokenContext = this.tokenContext;
-      }
-      if (oldTokenContext & TokenContext.forInOrInitHeadAccumulate) {
+      if (!resetTokenContext) oldTokenContext = this.tokenContext;
+      if (oldTokenContext & TokenContext.forInOrInitHeadAccumulate)
         this.tokenContext = 0;
-      }
       oldNoLineTerminatorAfterNode = this._noLineTerminatorAfterNode;
       this._noLineTerminatorAfterNode = null;
     }
 
     this._printLeadingComments(node, parent);
 
-    this.exactSource(
-      nodeId === __node("Program") || nodeId === __node("File") ? null : loc,
-      printMethod.bind(this, node, parent),
-    );
+    this.source("start", loc ?? undefined);
+    if (loc?.identifierName != null) {
+      this._canMarkIdName = false;
+      this._sourcePosition.identifierName = loc.identifierName;
+    }
+    printMethod.apply(this, [node, parent, typeFallback]);
+    if (loc?.identifierName != null) {
+      this._canMarkIdName = true;
+      this._sourcePosition.identifierName = undefined;
+    }
+    this.source("end", loc ?? undefined);
 
     if (shouldPrintParens) {
       this._printTrailingComments(node, parent);
@@ -868,55 +637,11 @@ class Printer {
     // end
     this._currentNode = parent;
     this._currentTypeId = parentId;
-    if (changedFlags) {
-      this._flags = flags;
-    }
-    if (flags & PRINTER_FLAGS.AUX_COMMENTS) {
-      this._insideAux = oldInAux!;
-    }
 
-    if (oldNoLineTerminatorAfterNode != null) {
+    if (oldNoLineTerminatorAfterNode != null)
       this._noLineTerminatorAfterNode = oldNoLineTerminatorAfterNode;
-    }
 
     this._innerCommentsState = INNER_COMMENTS_STATE.DISALLOWED;
-  }
-
-  _maybeAddAuxComment(enteredPositionlessNode?: boolean) {
-    if (enteredPositionlessNode) this._printAuxBeforeComment();
-    if (!this._insideAux) this._printAuxAfterComment();
-  }
-
-  _printAuxBeforeComment() {
-    if (this._printAuxAfterOnNextUserNode) return;
-    this._printAuxAfterOnNextUserNode = true;
-
-    const comment = this.format.auxiliaryCommentBefore;
-    if (comment) {
-      this._printComment(
-        {
-          type: "CommentBlock",
-          value: comment,
-        },
-        COMMENT_SKIP_NEWLINE.DEFAULT,
-      );
-    }
-  }
-
-  _printAuxAfterComment() {
-    if (!this._printAuxAfterOnNextUserNode) return;
-    this._printAuxAfterOnNextUserNode = false;
-
-    const comment = this.format.auxiliaryCommentAfter;
-    if (comment) {
-      this._printComment(
-        {
-          type: "CommentBlock",
-          value: comment,
-        },
-        COMMENT_SKIP_NEWLINE.DEFAULT,
-      );
-    }
   }
 
   getPossibleRaw(
@@ -932,10 +657,9 @@ class Printer {
       extra?.raw != null &&
       extra.rawValue != null &&
       node.value === extra.rawValue
-    ) {
+    )
       // @ts-expect-error: The extra.raw of these AST node types must be a string
       return extra.raw;
-    }
   }
 
   printJoin(
@@ -949,16 +673,7 @@ class Printer {
   ) {
     if (!nodes?.length) return;
 
-    const flags = this._flags;
-
-    if (indent == null && flags & PRINTER_FLAGS.RETAIN_LINES) {
-      const startLine = nodes[0].loc?.start.line;
-      if (startLine != null && startLine !== this._buf.getCurrentLine()) {
-        indent = true;
-      }
-    }
-
-    if (indent) this.indent(flags);
+    if (indent) this.indent();
 
     const len = nodes.length;
     for (let i = 0; i < len; i++) {
@@ -966,8 +681,8 @@ class Printer {
       if (!node) continue;
 
       // don't add newlines at the beginning of the file
-      if (statement && i === 0 && this._buf.hasContent()) {
-        this.newline(1, flags);
+      if (statement && i === 0 && this._last !== 0) {
+        this.newline(1);
       }
 
       this.print(
@@ -978,30 +693,30 @@ class Printer {
       );
 
       if (separator != null) {
-        if (i < len - 1) separator.call(this, i, false);
-        else if (printTrailingSeparator) separator.call(this, i, true);
+        if (i < len - 1) separator.call(this, false);
+        else if (printTrailingSeparator) separator.call(this, true);
       }
 
       if (statement) {
         if (i + 1 === len) {
-          this.newline(1, flags);
+          this.newline(1);
         } else {
           const lastCommentLine = this._lastCommentLine;
           if (lastCommentLine > 0) {
             const offset =
               (nodes[i + 1].loc?.start.line || 0) - lastCommentLine;
             if (offset >= 0) {
-              this.newline(offset || 1, flags);
+              this.newline(offset || 1);
               continue;
             }
           }
 
-          this.newline(1, flags);
+          this.newline(1);
         }
       }
     }
 
-    if (indent) this.dedent(flags);
+    if (indent) this.dedent();
   }
 
   printAndIndentOnComments(node: t.Node) {
@@ -1012,9 +727,7 @@ class Printer {
   }
 
   printBlock(body: t.Statement) {
-    if (body.type !== "EmptyStatement") {
-      this.space();
-    }
+    if (body.type !== "EmptyStatement") this.space();
 
     this.print(body);
   }
@@ -1056,10 +769,7 @@ class Printer {
     this._printComments(COMMENT_TYPE.LEADING, comments, node, parent);
   }
 
-  _maybePrintInnerComments(
-    nextTokenStr: string | number,
-    nextTokenOccurrenceCount?: number,
-  ) {
+  _maybePrintInnerComments() {
     const state = this._innerCommentsState;
     switch (state & INNER_COMMENTS_STATE.MASK) {
       case INNER_COMMENTS_STATE.DISALLOWED:
@@ -1067,14 +777,7 @@ class Printer {
           INNER_COMMENTS_STATE.ALLOWED | INNER_COMMENTS_STATE.WITH_INDENT;
         return;
       case INNER_COMMENTS_STATE.ALLOWED:
-        this.printInnerComments(
-          (state & INNER_COMMENTS_STATE.WITH_INDENT) > 0,
-          this.tokenMap?.findMatching(
-            this._currentNode!,
-            nextTokenStr,
-            nextTokenOccurrenceCount,
-          ),
-        );
+        this.printInnerComments((state & INNER_COMMENTS_STATE.WITH_INDENT) > 0);
     }
   }
 
@@ -1086,7 +789,7 @@ class Printer {
       return;
     }
 
-    const hasSpace = this.endsWith(charCodes.space);
+    const hasSpace = this.endsWith(32);
     if (indent) this.indent();
 
     switch (
@@ -1142,25 +845,14 @@ class Printer {
       items,
       statement,
       indent,
-      separator ?? commaSeparator,
+      separator ??
+        ((last: boolean) => {
+          this.tokenChar(44, "punctuation");
+          if (!last) this.space();
+        }),
       printTrailingSeparator,
       resetTokenContext,
     );
-  }
-
-  shouldPrintTrailingComma(listEnd: string | number): boolean | null {
-    if (!this.tokenMap) return null;
-
-    const listEndIndex = this.tokenMap.findLastIndex(
-      this._currentNode!,
-      (token) =>
-        this.tokenMap!.matchesOriginal(
-          token,
-          typeof listEnd === "number" ? String.fromCharCode(listEnd) : listEnd,
-        ),
-    );
-    if (listEndIndex <= 0) return null;
-    return this.tokenMap.matchesOriginal(this._tokens![listEndIndex - 1], ",");
   }
 
   // Returns `PRINT_COMMENT_HINT.DEFER` if the comment cannot be printed in this position due to
@@ -1185,21 +877,7 @@ class Printer {
       return PRINT_COMMENT_HINT.DEFER;
     }
 
-    if (nextToken && this.tokenMap) {
-      const commentTok = this.tokenMap.find(
-        this._currentNode!,
-        (token) => token.value === comment.value,
-      );
-      if (commentTok && commentTok.start > nextToken.start) {
-        return PRINT_COMMENT_HINT.DEFER;
-      }
-    }
-
     this._printedComments.add(comment);
-
-    if (!this.format.shouldPrintComment(comment.value)) {
-      return PRINT_COMMENT_HINT.SKIP;
-    }
 
     return PRINT_COMMENT_HINT.ALLOW;
   }
@@ -1217,7 +895,7 @@ class Printer {
 
     if (
       printNewLines &&
-      this._buf.hasContent() &&
+      this._last !== 0 &&
       skipNewLines !== COMMENT_SKIP_NEWLINE.LEADING
     ) {
       this.newline(1);
@@ -1225,12 +903,12 @@ class Printer {
 
     switch (this.getLastChar(true)) {
       // Avoid converting a / operator into a line comment by appending /* to it
-      case charCodes.slash:
+      case 47:
         this._space();
       // falls through
-      case charCodes.leftSquareBracket:
-      case charCodes.leftCurlyBrace:
-      case charCodes.leftParenthesis:
+      case 91:
+      case 123:
+      case 40:
         break;
 
       default:
@@ -1240,26 +918,20 @@ class Printer {
     let val;
     if (isBlockComment) {
       val = `/*${comment.value}*/`;
-      if (this.format.indent.adjustMultilineComment) {
-        const offset = comment.loc?.start.column;
-        if (offset) {
-          const newlineRegex = new RegExp("\\n\\s{1," + offset + "}", "g");
-          val = val.replace(newlineRegex, "\n");
-        }
-        if (this._flags & PRINTER_FLAGS.CONCISE) {
-          val = val.replace(/\n(?!$)/g, `\n`);
-        } else {
-          let indentSize = this.format.retainLines
-            ? 0
-            : this._buf.getCurrentColumn();
-
-          if (this._shouldIndent() || this.format.retainLines) {
-            indentSize += this._indent;
-          }
-
-          val = val.replace(/\n(?!$)/g, `\n${" ".repeat(indentSize)}`);
-        }
+      const offset = comment.loc?.start.column;
+      if (offset) {
+        const newlineRegex = new RegExp("\\n\\s{1," + offset + "}", "g");
+        val = val.replace(newlineRegex, "\n");
       }
+
+      val = val.replace(
+        /\n(?!$)/g,
+        `\n${" ".repeat(
+          this._position.column +
+            (this._queuedChar ? 1 : 0) +
+            (this.endsWith(10) ? this._indent : 0),
+        )}`,
+      );
     } else if (!noLineTerminator) {
       val = `//${comment.value}`;
     } else {
@@ -1270,15 +942,12 @@ class Printer {
     }
 
     this.source("start", comment.loc);
-    this._append(val, isBlockComment);
+    this._append(val, "comment", isBlockComment);
 
-    if (!isBlockComment && !noLineTerminator) {
-      this._newline();
-    }
+    if (!isBlockComment && !noLineTerminator) this._newline();
 
-    if (printNewLines && skipNewLines !== COMMENT_SKIP_NEWLINE.TRAILING) {
+    if (printNewLines && skipNewLines !== COMMENT_SKIP_NEWLINE.TRAILING)
       this.newline(1);
-    }
   }
 
   _printComments(
@@ -1297,7 +966,7 @@ class Printer {
     let lastLine = 0;
     let leadingCommentNewline = 0;
 
-    const { _noLineTerminator, _flags } = this;
+    const { _noLineTerminator } = this;
 
     for (let i = 0; i < len; i++) {
       const comment = comments[i];
@@ -1317,20 +986,17 @@ class Printer {
             // Because currently we cannot handle blank lines before leading comments,
             // we always wrap before and after multi-line comments.
             if (
-              this._buf.hasContent() &&
+              this._last !== 0 &&
               (comment.type === "CommentLine" ||
                 commentStartLine !== commentEndLine)
-            ) {
+            )
               offset = leadingCommentNewline = 1;
-            }
-          } else {
-            offset = commentStartLine - lastLine;
-          }
+          } else offset = commentStartLine - lastLine;
+
           lastLine = commentEndLine;
 
-          if (offset > 0 && !_noLineTerminator) {
-            this.newline(offset, _flags);
-          }
+          if (offset > 0 && !_noLineTerminator) this.newline(offset);
+
           this._printComment(comment, COMMENT_SKIP_NEWLINE.ALL);
 
           if (i + 1 === len) {
@@ -1338,9 +1004,8 @@ class Printer {
               nodeStartLine - lastLine,
               leadingCommentNewline,
             );
-            if (count > 0 && !_noLineTerminator) {
-              this.newline(count, _flags);
-            }
+            if (count > 0 && !_noLineTerminator) this.newline(count);
+
             lastLine = nodeStartLine;
           }
         } else if (type === COMMENT_TYPE.INNER) {
@@ -1348,16 +1013,14 @@ class Printer {
             commentStartLine - (i === 0 ? nodeStartLine : lastLine);
           lastLine = commentEndLine;
 
-          if (offset > 0 && !_noLineTerminator) {
-            this.newline(offset, _flags);
-          }
+          if (offset > 0 && !_noLineTerminator) this.newline(offset);
+
           this._printComment(comment, COMMENT_SKIP_NEWLINE.ALL);
 
           if (i + 1 === len) {
             const count = Math.min(1, nodeEndLine - lastLine);
-            if (count > 0 && !_noLineTerminator) {
-              this.newline(count, _flags);
-            }
+            if (count > 0 && !_noLineTerminator) this.newline(count);
+
             lastLine = nodeEndLine;
           }
         } else {
@@ -1365,16 +1028,13 @@ class Printer {
             commentStartLine - (i === 0 ? nodeEndLine - lineOffset : lastLine);
           lastLine = commentEndLine;
 
-          if (offset > 0 && !_noLineTerminator) {
-            this.newline(offset, _flags);
-          }
+          if (offset > 0 && !_noLineTerminator) this.newline(offset);
+
           this._printComment(comment, COMMENT_SKIP_NEWLINE.ALL);
         }
       } else {
         hasLoc = false;
-        if (shouldPrint !== PRINT_COMMENT_HINT.ALLOW) {
-          continue;
-        }
+        if (shouldPrint !== PRINT_COMMENT_HINT.ALLOW) continue;
 
         if (len === 1) {
           const singleLine = comment.loc
@@ -1388,7 +1048,7 @@ class Printer {
             !isTSInterfaceBody(parent) &&
             !isTSEnumMember(node);
 
-          if (type === COMMENT_TYPE.LEADING) {
+          if (type === COMMENT_TYPE.LEADING)
             this._printComment(
               comment,
               (shouldSkipNewline && node.type !== "ObjectExpression") ||
@@ -1396,11 +1056,9 @@ class Printer {
                 ? COMMENT_SKIP_NEWLINE.ALL
                 : COMMENT_SKIP_NEWLINE.DEFAULT,
             );
-          } else if (shouldSkipNewline && type === COMMENT_TYPE.TRAILING) {
+          else if (shouldSkipNewline && type === COMMENT_TYPE.TRAILING)
             this._printComment(comment, COMMENT_SKIP_NEWLINE.ALL);
-          } else {
-            this._printComment(comment, COMMENT_SKIP_NEWLINE.DEFAULT);
-          }
+          else this._printComment(comment, COMMENT_SKIP_NEWLINE.DEFAULT);
         } else if (
           type === COMMENT_TYPE.INNER &&
           !(node.type === "ObjectExpression" && node.properties.length > 1) &&
@@ -1420,22 +1078,41 @@ class Printer {
                 ? COMMENT_SKIP_NEWLINE.TRAILING
                 : COMMENT_SKIP_NEWLINE.DEFAULT,
           );
-        } else {
-          this._printComment(comment, COMMENT_SKIP_NEWLINE.DEFAULT);
-        }
+        } else this._printComment(comment, COMMENT_SKIP_NEWLINE.DEFAULT);
       }
     }
 
-    if (type === COMMENT_TYPE.TRAILING && hasLoc && lastLine) {
+    if (type === COMMENT_TYPE.TRAILING && hasLoc && lastLine)
       this._lastCommentLine = lastLine;
-    }
+
     return PRINT_COMMENTS_RESULT.PRINTED_ALL;
+  }
+
+  /**
+   * Mark the current generated position with a source position. May also be passed null line/column
+   * values to insert a mapping to nothing.
+   */
+  mark(
+    generated: { line: number; column: number },
+    line?: number,
+    column?: number,
+    identifierName?: string | null,
+  ) {
+    if (this._map) {
+      if (line != null) {
+        if (identifierName)
+          maybeAddMapping(this._map, {
+            name: identifierName ?? undefined,
+            generated,
+            source: "",
+            original: {
+              line: line,
+              column: column!,
+            },
+          });
+      } else maybeAddMapping(this._map, { generated });
+    }
   }
 }
 
 export default Printer;
-
-function commaSeparator(this: Printer, occurrenceCount: number, last: boolean) {
-  this.tokenChar(charCodes.comma, occurrenceCount);
-  if (!last) this.space();
-}

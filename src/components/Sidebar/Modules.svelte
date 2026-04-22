@@ -153,7 +153,7 @@
   }
 
   .sources button {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text);
     padding: 4px 6px;
     border-radius: 0;
@@ -168,7 +168,6 @@
   }
 
   .sources button.active {
-    color: var(--text);
-    font-weight: 700;
+    font-weight: bold;
   }
 </style>

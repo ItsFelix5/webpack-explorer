@@ -150,52 +150,6 @@ svg {
   padding: 10px;
 }
 
-/* Syntax highlighting */
-.comment {
-  color: #6a737d;
-  font-style: italic;
-}
-
-.string {
-  color: #9ecbff;
-}
-
-.number {
-  color: #79c0ff;
-}
-
-.boolean {
-  color: #79c0ff;
-}
-
-.keyword {
-  color: #ff7b72;
-}
-
-.function {
-  color: #d2a8ff;
-}
-
-.variable {
-  color: #ffa657;
-}
-
-.constant {
-  color: #79c0ff;
-}
-
-.operator {
-  color: #ff7b72;
-}
-
-.punctuation {
-  color: #e6edf3;
-}
-
-.property {
-  color: #7ee787;
-}
-
 .indent {
   display: inline-block;
   position: relative;
@@ -212,7 +166,46 @@ svg {
   top: 0;
 }
 
-.newline,
-.whitespace {
-  /* No styling needed */
+.comment {
+  color: #7f848e;
+  font-style: italic;
+}
+
+.string {
+  color: #98c379;
+}
+
+.regex,
+.variable {
+  color: #e06c75;
+}
+
+.number,
+.boolean,
+.builtin {
+  color: #d19a66;
+}
+
+.constant {
+  color: #e5c07b;
+}
+
+.keyword {
+  color: #c678dd;
+}
+
+.function {
+  color: #61afef;
+}
+
+.operator {
+  color: #56b6c2;
+}
+
+.punctuation {
+  color: #abb2bf;
+}
+
+.property {
+  color: #7ee787;
 }

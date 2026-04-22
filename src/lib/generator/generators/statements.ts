@@ -2,8 +2,7 @@ import type Printer from "../printer";
 import { isFor, isIfStatement, isStatement, isVoidPattern } from "@babel/types";
 import type * as t from "@babel/types";
 
-import * as charCodes from "../charcodes";
-import { TokenContext } from "../node/index";
+import { TokenContext } from "../node";
 
 export function WithStatement(this: Printer, node: t.WithStatement) {
   this.word("with");
@@ -39,7 +38,7 @@ export function IfStatement(this: Printer, node: t.IfStatement) {
   }
 
   if (node.alternate) {
-    if (this.endsWith(charCodes.rightCurlyBrace)) this.space();
+    if (this.endsWith(125)) this.space();
     this.word("else");
     this.space();
     this.printAndIndentOnComments(node.alternate);
@@ -60,27 +59,27 @@ function getLastStatement(statement: t.Statement): t.Statement {
 export function ForStatement(this: Printer, node: t.ForStatement) {
   this.word("for");
   this.space();
-  this.token("(");
+  this.token("(", "bracket");
 
   this.tokenContext |=
     TokenContext.forInitHead | TokenContext.forInOrInitHeadAccumulate;
   this.print(node.init);
   this.tokenContext = TokenContext.normal;
 
-  this.token(";");
+  this.token(";", "punctuation");
 
   if (node.test) {
     this.space();
     this.print(node.test);
   }
-  this.tokenChar(charCodes.semicolon, 1);
+  this.tokenChar(59, "punctuation");
 
   if (node.update) {
     this.space();
     this.print(node.update);
   }
 
-  this.token(")");
+  this.token(")", "bracket");
   this.printBlock(node.body);
 }
 
@@ -148,7 +147,8 @@ function printStatementAfterKeyword(
 ) {
   if (node) {
     printer.space();
-    printer.printTerminatorless(node);
+    printer._noLineTerminator = true;
+    printer.print(node);
   }
 
   printer.semicolon();
@@ -255,8 +255,8 @@ export function DebuggerStatement(this: Printer) {
   this.semicolon();
 }
 
-function commaSeparatorWithNewline(this: Printer, occurrenceCount: number) {
-  this.tokenChar(charCodes.comma, occurrenceCount);
+function commaSeparatorWithNewline(this: Printer) {
+  this.tokenChar(44, "punctuation");
   this.newline();
 }
 
@@ -278,7 +278,7 @@ export function VariableDeclaration(
       this.space();
     // fallthrough
     case "using":
-      this.word("using", true);
+      this.word("using", "keyword", true);
       break;
     default:
       this.word(kind);
@@ -345,7 +345,7 @@ export function VariableDeclarator(this: Printer, node: t.VariableDeclarator) {
 
   if (node.init) {
     this.space();
-    this.token("=");
+    this.token("=", "operator");
     this.space();
     this.print(node.init);
   }

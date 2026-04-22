@@ -10,7 +10,7 @@ export function JSXAttribute(this: Printer, node: t.JSXAttribute) {
 }
 
 export function JSXIdentifier(this: Printer, node: t.JSXIdentifier) {
-  this.word(node.name);
+  this.word(node.name, "variable");
 }
 
 export function JSXNamespacedName(this: Printer, node: t.JSXNamespacedName) {
@@ -52,13 +52,7 @@ export function JSXSpreadChild(this: Printer, node: t.JSXSpreadChild) {
 }
 
 export function JSXText(this: Printer, node: t.JSXText) {
-  const raw = this.getPossibleRaw(node);
-
-  if (raw !== undefined) {
-    this.token(raw, true);
-  } else {
-    this.token(node.value, true);
-  }
+  this.token(this.getPossibleRaw(node) ?? node.value, "string", true);
 }
 
 export function JSXElement(this: Printer, node: t.JSXElement) {

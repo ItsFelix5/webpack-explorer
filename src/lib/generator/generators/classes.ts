@@ -5,7 +5,6 @@ import {
 } from "@babel/types";
 import type * as t from "@babel/types";
 
-import * as charCodes from "../charcodes";
 import { _shouldPrintDecoratorsBeforeExport } from "./expressions";
 import { _tsPrintClassMemberModifiers } from "./typescript";
 import { _variance } from "./flow";
@@ -45,7 +44,7 @@ export function ClassDeclaration(
 
   if (node.id) {
     this.space();
-    this.print(node.id);
+    this.print(node.id, false, false, undefined, "class");
   }
 
   this.print(node.typeParameters);
@@ -72,92 +71,28 @@ export function ClassDeclaration(
 export { ClassDeclaration as ClassExpression };
 
 export function ClassBody(this: Printer, node: t.ClassBody) {
-  this.token("{");
+  this.token("{", "bracket");
   if (node.body.length === 0) {
-    this.token("}");
+    this.token("}", "bracket");
   } else {
-    const separator = classBodyEmptySemicolonsPrinter(this, node);
-    separator?.(-1); // print leading semicolons in preserveFormat mode
-
     const oldNoLineTerminatorAfterNode = this.enterDelimited();
-    this.printJoin(node.body, true, true, separator, true, true);
+    this.printJoin(node.body, true, true, null, true, true);
     this._noLineTerminatorAfterNode = oldNoLineTerminatorAfterNode;
 
-    if (!this.endsWith(charCodes.lineFeed)) this.newline();
+    if (!this.endsWith(10)) this.newline();
 
     this.rightBrace(node);
   }
 }
-
-function classBodyEmptySemicolonsPrinter(printer: Printer, node: t.ClassBody) {
-  if (!printer.tokenMap || node.start == null || node.end == null) {
-    return null;
-  }
-
-  // "empty statements" in class bodies are not represented in the AST.
-  // Print them by checking if there are any ; tokens between the current AST
-  // member and the next one.
-
-  const indexes = printer.tokenMap.getIndexes(node);
-  if (!indexes) return null;
-
-  let k = 1; // start from 1 to skip '{'
-
-  let occurrenceCount = 0;
-
-  let nextLocIndex = 0;
-  const advanceNextLocIndex = () => {
-    while (
-      nextLocIndex < node.body.length &&
-      node.body[nextLocIndex].start == null
-    ) {
-      nextLocIndex++;
-    }
-  };
-  advanceNextLocIndex();
-
-  return (i: number) => {
-    if (nextLocIndex <= i) {
-      nextLocIndex = i + 1;
-      advanceNextLocIndex();
-    }
-
-    const end =
-      nextLocIndex === node.body.length
-        ? node.end
-        : node.body[nextLocIndex].start;
-
-    let tok;
-    while (
-      k < indexes.length &&
-      printer.tokenMap!.matchesOriginal(
-        (tok = printer._tokens![indexes[k]]),
-        ";",
-      ) &&
-      tok.start < end!
-    ) {
-      printer.tokenChar(charCodes.semicolon, occurrenceCount++);
-      k++;
-    }
-  };
-}
-
 export function ClassProperty(this: Printer, node: t.ClassProperty) {
   this.printJoin(node.decorators);
-
-  if (!node.static && !this.format.preserveFormat) {
-    // catch up to property key, avoid line break
-    // between member TS modifiers and the property key.
-    const endLine = node.key.loc?.end?.line;
-    if (endLine) this.catchUp(endLine);
-  }
 
   _tsPrintClassMemberModifiers.call(this, node);
 
   if (node.computed) {
-    this.token("[");
+    this.token("[", "bracket");
     this.print(node.key);
-    this.token("]");
+    this.token("]", "bracket");
   } else {
     _variance.call(this, node);
     this.print(node.key);
@@ -165,16 +100,16 @@ export function ClassProperty(this: Printer, node: t.ClassProperty) {
 
   // TS
   if (node.optional) {
-    this.token("?");
+    this.token("?", "punctuation");
   }
   if (node.definite) {
-    this.token("!");
+    this.token("!", "punctuation");
   }
 
   this.print(node.typeAnnotation);
   if (node.value) {
     this.space();
-    this.token("=");
+    this.token("=", "operator");
     this.space();
     this.print(node.value);
   }
@@ -187,21 +122,16 @@ export function ClassAccessorProperty(
 ) {
   this.printJoin(node.decorators);
 
-  // catch up to property key, avoid line break
-  // between member modifiers and the property key.
-  const endLine = node.key.loc?.end?.line;
-  if (endLine) this.catchUp(endLine);
-
   // TS does not support class accessor property yet
   _tsPrintClassMemberModifiers.call(this, node);
 
-  this.word("accessor", true);
+  this.word("accessor", "keyword", true);
   this.space();
 
   if (node.computed) {
-    this.token("[");
+    this.token("[", "bracket");
     this.print(node.key);
-    this.token("]");
+    this.token("]", "bracket");
   } else {
     // Todo: Flow does not support class accessor property yet.
     _variance.call(this, node);
@@ -210,16 +140,16 @@ export function ClassAccessorProperty(
 
   // TS
   if (node.optional) {
-    this.token("?");
+    this.token("?", "punctuation");
   }
   if (node.definite) {
-    this.token("!");
+    this.token("!", "punctuation");
   }
 
   this.print(node.typeAnnotation);
   if (node.value) {
     this.space();
-    this.token("=");
+    this.token("=", "operator");
     this.space();
     this.print(node.value);
   }
@@ -235,15 +165,15 @@ export function ClassPrivateProperty(
   this.print(node.key);
   // TS
   if (node.optional) {
-    this.token("?");
+    this.token("?", "punctuation");
   }
   if (node.definite) {
-    this.token("!");
+    this.token("!", "punctuation");
   }
   this.print(node.typeAnnotation);
   if (node.value) {
     this.space();
-    this.token("=");
+    this.token("=", "operator");
     this.space();
     this.print(node.value);
   }
@@ -271,13 +201,6 @@ export function _classMethodHead(
     this.printJoin((node as t.ClassMethod | t.ClassPrivateMethod).decorators);
   }
 
-  if (!this.format.preserveFormat) {
-    // catch up to method key, avoid line break
-    // between member modifiers/method heads and the method key.
-    const endLine = node.key.loc?.end?.line;
-    if (endLine) this.catchUp(endLine);
-  }
-
   _tsPrintClassMemberModifiers.call(this, node);
   _methodHead.call(this, node);
 }
@@ -285,9 +208,9 @@ export function _classMethodHead(
 export function StaticBlock(this: Printer, node: t.StaticBlock) {
   this.word("static");
   this.space();
-  this.token("{");
+  this.token("{", "bracket");
   if (node.body.length === 0) {
-    this.token("}");
+    this.token("}", "bracket");
   } else {
     this.newline();
     this.printSequence(node.body, true);

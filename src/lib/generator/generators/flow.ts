@@ -2,7 +2,7 @@ import type Printer from "../printer";
 import { isDeclareExportDeclaration, isStatement } from "@babel/types";
 import type * as t from "@babel/types";
 import { ExportAllDeclaration } from "./modules";
-import { TokenContext } from "../node/index";
+import { TokenContext } from "../node";
 
 export function AnyTypeAnnotation(this: Printer) {
   this.word("any");
@@ -13,8 +13,8 @@ export function ArrayTypeAnnotation(
   node: t.ArrayTypeAnnotation,
 ) {
   this.print(node.elementType, true);
-  this.token("[");
-  this.token("]");
+  this.token("[", "bracket");
+  this.token("]", "bracket");
 }
 
 export function BooleanTypeAnnotation(this: Printer) {
@@ -71,7 +71,7 @@ export function DeclareFunction(
 }
 
 export function InferredPredicate(this: Printer) {
-  this.token("%");
+  this.token("%", "operator");
   this.word("checks");
 }
 
@@ -428,9 +428,9 @@ export function InterfaceDeclaration(
   _interfaceish.call(this, node);
 }
 
-function andSeparator(this: Printer, occurrenceCount: number) {
+function andSeparator(this: Printer) {
   this.space();
-  this.token("&", false, occurrenceCount);
+  this.token("&", "operator", false);
   this.space();
 }
 
@@ -476,7 +476,7 @@ export {
   BigIntLiteral as BigIntLiteralTypeAnnotation,
   NumericLiteral as NumberLiteralTypeAnnotation,
   StringLiteral as StringLiteralTypeAnnotation,
-} from "./types.ts";
+} from "./types";
 
 export function NumberTypeAnnotation(this: Printer) {
   this.word("number");
@@ -744,9 +744,9 @@ export function SymbolTypeAnnotation(this: Printer) {
   this.word("symbol");
 }
 
-function orSeparator(this: Printer, occurrenceCount: number) {
+function orSeparator(this: Printer) {
   this.space();
-  this.token("|", false, occurrenceCount);
+  this.token("|", "operator", false);
   this.space();
 }
 

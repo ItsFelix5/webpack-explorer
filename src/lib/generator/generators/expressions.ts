@@ -1,23 +1,16 @@
 import type Printer from "../printer";
-import {
-  isCallExpression,
-  isLiteral,
-  isMemberExpression,
-  isNewExpression,
-  isPattern,
-} from "@babel/types";
-import * as charCodes from "../charcodes";
-import type * as t from "@babel/types";
-import { TokenContext } from "../node/index";
+import { isLiteral, isMemberExpression, isPattern } from "@babel/types";
+import * as t from "@babel/types";
+import { TokenContext } from "../node";
 
 export function UnaryExpression(this: Printer, node: t.UnaryExpression) {
   const { operator } = node;
   const firstChar = operator.charCodeAt(0);
-  if (firstChar >= charCodes.lowercaseA && firstChar <= charCodes.lowercaseZ) {
-    this.word(operator);
+  if (firstChar >= 97 && firstChar <= 122) {
+    this.word(operator, "keyword");
     this.space();
   } else {
-    this.tokenChar(firstChar);
+    this.tokenChar(firstChar, "operator");
   }
 
   this.print(node.argument);
@@ -25,7 +18,7 @@ export function UnaryExpression(this: Printer, node: t.UnaryExpression) {
 
 export function DoExpression(this: Printer, node: t.DoExpression) {
   if (node.async) {
-    this.word("async", true);
+    this.word("async", "keyword", true);
     this.space();
   }
   this.word("do");
@@ -37,7 +30,7 @@ export function ParenthesizedExpression(
   this: Printer,
   node: t.ParenthesizedExpression,
 ) {
-  this.token("(");
+  this.token("(", "bracket");
   const oldNoLineTerminatorAfterNode = this.enterDelimited();
   this.print(node.expression, undefined, true);
   this._noLineTerminatorAfterNode = oldNoLineTerminatorAfterNode;
@@ -46,11 +39,11 @@ export function ParenthesizedExpression(
 
 export function UpdateExpression(this: Printer, node: t.UpdateExpression) {
   if (node.prefix) {
-    this.token(node.operator, false, 0, true);
+    this.token(node.operator, "", false, true);
     this.print(node.argument);
   } else {
     this.print(node.argument, true);
-    this.token(node.operator, false, 0, true);
+    this.token(node.operator, "", false, true);
   }
 }
 
@@ -60,11 +53,11 @@ export function ConditionalExpression(
 ) {
   this.print(node.test);
   this.space();
-  this.token("?");
+  this.token("?", "keyword");
   this.space();
   this.print(node.consequent);
   this.space();
-  this.token(":");
+  this.token(":", "keyword");
   this.space();
   this.print(node.alternate);
 }
@@ -73,16 +66,9 @@ function _printExpressionArguments(
   this: Printer,
   node: t.CallExpression | t.NewExpression | t.OptionalCallExpression,
 ) {
-  this.token("(");
+  this.token("(", "bracket");
   const oldNoLineTerminatorAfterNode = this.enterDelimited();
-  this.printList(
-    node.arguments,
-    this.shouldPrintTrailingComma(")"),
-    undefined,
-    undefined,
-    undefined,
-    true,
-  );
+  this.printList(node.arguments, null, undefined, undefined, undefined, true);
   this._noLineTerminatorAfterNode = oldNoLineTerminatorAfterNode;
   this.rightParens(node);
 }
@@ -95,25 +81,8 @@ export function NewExpression(
   this.word("new");
   this.space();
   this.print(node.callee);
-  if (
-    this.format.minified &&
-    node.arguments.length === 0 &&
-    !isCallExpression(parent, { callee: node }) &&
-    !isMemberExpression(parent) &&
-    !isNewExpression(parent)
-  ) {
-    return;
-  }
 
   this.print(node.typeArguments);
-
-  if (
-    node.arguments.length === 0 &&
-    this.tokenMap &&
-    !this.tokenMap.endMatches(node, ")")
-  ) {
-    return;
-  }
 
   _printExpressionArguments.call(this, node);
 }
@@ -164,16 +133,16 @@ export function OptionalMemberExpression(
     computed = true;
   }
   if (optional) {
-    this.token("?.");
+    this.token("?.", "punctuation");
   }
 
   if (computed) {
-    this.token("[");
+    this.token("[", "bracket");
     this.print(property);
-    this.token("]");
+    this.token("]", "bracket");
   } else {
     if (!optional) {
-      this.token(".");
+      this.token(".", "punctuation");
     }
     this.print(property);
   }
@@ -183,11 +152,9 @@ export function OptionalCallExpression(
   this: Printer,
   node: t.OptionalCallExpression,
 ) {
-  this.print(node.callee);
+  this.print(node.callee, false, false, undefined, "function");
 
-  if (node.optional) {
-    this.token("?.");
-  }
+  if (node.optional) this.token("?.", "punctuation");
 
   this.print(node.typeArguments);
 
@@ -195,10 +162,8 @@ export function OptionalCallExpression(
 }
 
 export function CallExpression(this: Printer, node: t.CallExpression) {
-  this.print(node.callee);
-
+  this.print(node.callee, false, false, undefined, "function");
   this.print(node.typeArguments);
-
   _printExpressionArguments.call(this, node);
 }
 
@@ -214,15 +179,15 @@ export function AwaitExpression(this: Printer, node: t.AwaitExpression) {
 
 export function YieldExpression(this: Printer, node: t.YieldExpression) {
   if (node.delegate) {
-    this.word("yield", true);
-    this.token("*");
+    this.word("yield", "keyword", true);
+    this.token("*", "keyword");
     if (node.argument) {
       this.space();
       // line terminators are allowed after yield*
       this.print(node.argument);
     }
   } else if (node.argument) {
-    this.word("yield", true);
+    this.word("yield", "keyword", true);
     this.space();
     this.print(node.argument);
   } else {
@@ -246,11 +211,11 @@ export function ExpressionStatement(
 export function AssignmentPattern(this: Printer, node: t.AssignmentPattern) {
   this.print(node.left);
   if (node.left.type === "Identifier" || isPattern(node.left)) {
-    if (node.left.optional) this.token("?");
+    if (node.left.optional) this.token("?", "punctuation");
     this.print(node.left.typeAnnotation);
   }
   this.space();
-  this.token("=");
+  this.token("=", "operator");
   this.space();
   this.print(node.right);
 }
@@ -262,7 +227,7 @@ export function AssignmentExpression(
   this.print(node.left);
 
   this.space();
-  this.token(node.operator, false, 0, true);
+  this.token(node.operator, "operator", false, true);
   this.space();
 
   this.print(node.right);
@@ -275,10 +240,10 @@ export function BinaryExpression(this: Printer, node: t.BinaryExpression) {
 
   this.space();
   const { operator } = node;
-  if (operator.charCodeAt(0) === charCodes.lowercaseI) {
-    this.word(operator);
+  if (operator.charCodeAt(0) === 105) {
+    this.word(operator, "operator");
   } else {
-    this.token(operator, false, 0, true);
+    this.token(operator, "operator", false, true);
     this.setLastChar(operator.charCodeAt(operator.length - 1));
   }
   this.space();
@@ -288,11 +253,15 @@ export function BinaryExpression(this: Printer, node: t.BinaryExpression) {
 
 export function BindExpression(this: Printer, node: t.BindExpression) {
   this.print(node.object);
-  this.token("::");
+  this.token("::", "punctuation");
   this.print(node.callee);
 }
 
-export function MemberExpression(this: Printer, node: t.MemberExpression) {
+export function MemberExpression(
+  this: Printer,
+  node: t.MemberExpression,
+  parent: t.MemberExpression,
+) {
   this.print(node.object);
 
   if (!node.computed && isMemberExpression(node.property)) {
@@ -307,24 +276,30 @@ export function MemberExpression(this: Printer, node: t.MemberExpression) {
 
   if (computed) {
     const oldNoLineTerminatorAfterNode = this.enterDelimited();
-    this.token("[");
+    this.token("[", "bracket");
     this.print(node.property, undefined, true);
-    this.token("]");
+    this.token("]", "bracket");
     this._noLineTerminatorAfterNode = oldNoLineTerminatorAfterNode;
   } else {
-    this.token(".");
-    this.print(node.property);
+    this.token(".", "punctuation");
+    this.print(
+      node.property,
+      false,
+      false,
+      undefined,
+      t.isCallExpression(parent) ? "function" : undefined,
+    );
   }
 }
 
 export function MetaProperty(this: Printer, node: t.MetaProperty) {
   this.print(node.meta);
-  this.token(".");
+  this.token(".", "bracket");
   this.print(node.property);
 }
 
 export function PrivateName(this: Printer, node: t.PrivateName) {
-  this.token("#");
+  this.token("#", "property");
   this.print(node.id);
 }
 
@@ -332,14 +307,14 @@ export function V8IntrinsicIdentifier(
   this: Printer,
   node: t.V8IntrinsicIdentifier,
 ) {
-  this.token("%");
+  this.token("%", "operator");
   this.word(node.name);
 }
 
 export function ModuleExpression(this: Printer, node: t.ModuleExpression) {
-  this.word("module", true);
+  this.word("module", "keyword", true);
   this.space();
-  this.token("{");
+  this.token("{", "bracket");
   this.indent();
   const { body } = node;
   if (body.body.length || body.directives.length) {

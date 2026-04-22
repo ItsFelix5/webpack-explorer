@@ -23,18 +23,9 @@
     "vite": "^8.0.0-beta.13"
   },
   "dependencies": {
-    "@babel/generator": "^7.29.1",
-    "@babel/parser": "^7.29.0",
-    "@babel/traverse": "^7.29.0",
-    "@babel/types": "^7.29.0",
-    "@lucide/svelte": "^0.577.0",
-    "@shikijs/colorized-brackets": "^4.0.1",
-    "@shikijs/langs-precompiled": "^4.0.1",
-    "@shikijs/transformers": "^4.0.1",
-    "@types/babel__generator": "^7.27.0",
-    "@types/babel__traverse": "^7.28.0",
-    "shiki": "^4.0.1",
-    "vscode-oniguruma": "^2.0.1",
-    "vscode-textmate": "^9.3.2"
+    "@babel/parser": "^8.0.0-rc.3",
+    "@babel/traverse": "^8.0.0-rc.3",
+    "@babel/types": "^8.0.0-rc.3",
+    "@lucide/svelte": "^0.577.0"
   }
 }

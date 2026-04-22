@@ -1,8 +1,7 @@
 import type Printer from "../printer";
 import type * as t from "@babel/types";
 import { isIdentifier, type ParentMaps } from "@babel/types";
-import * as charCodes from "../charcodes";
-import { TokenContext } from "../node/index";
+import { TokenContext } from "../node";
 
 type ParentsOf<T extends t.Node> = ParentMaps[T["type"]];
 
@@ -23,7 +22,7 @@ export function _params(
   }
 
   this.token("(");
-  _parameters.call(this, node.params, charCodes.rightParenthesis);
+  _parameters.call(this, node.params, 41);
 
   this.print(node.returnType, noLineTerminator);
 
@@ -37,19 +36,17 @@ export function _parameters(
 ) {
   const oldNoLineTerminatorAfterNode = this.enterDelimited();
 
-  const trailingComma = this.shouldPrintTrailingComma(endToken);
-
   const paramLength = parameters.length;
   for (let i = 0; i < paramLength; i++) {
     _param.call(this, parameters[i]);
 
-    if (trailingComma || i < paramLength - 1) {
-      this.tokenChar(charCodes.comma, i);
+    if (i < paramLength - 1) {
+      this.tokenChar(44, "punctuation");
       this.space();
     }
   }
 
-  this.tokenChar(endToken);
+  this.tokenChar(endToken, "bracket");
   this._noLineTerminatorAfterNode = oldNoLineTerminatorAfterNode;
 }
 
@@ -92,7 +89,7 @@ export function _methodHead(this: Printer, node: t.Method | t.TSDeclareMethod) {
   }
 
   if (node.async) {
-    this.word("async", true);
+    this.word("async", "keyword", true);
     this.space();
   }
 
@@ -122,7 +119,7 @@ export function _methodHead(this: Printer, node: t.Method | t.TSDeclareMethod) {
     this.token("?");
   }
 
-  if (this._buf._map) {
+  if (this._map) {
     _params.call(
       this,
       node,
@@ -159,38 +156,22 @@ export function _functionHead(
 ) {
   if (node.async) {
     this.word("async");
-    if (!this.format.preserveFormat) {
-      // We prevent inner comments from being printed here,
-      // so that they are always consistently printed in the
-      // same place regardless of the function type.
-      this._innerCommentsState = 0 /* INNER_COMMENT_STATE.DISALLOWED */;
-    }
+    this._innerCommentsState = 0;
     this.space();
   }
   this.word("function");
   if (node.generator) {
-    if (!this.format.preserveFormat) {
-      // We prevent inner comments from being printed here,
-      // so that they are always consistently printed in the
-      // same place regardless of the function type.
-      this._innerCommentsState = 0 /* INNER_COMMENT_STATE.DISALLOWED */;
-    }
+    this._innerCommentsState = 0;
     this.token("*");
   }
 
   this.space();
-  if (node.id) {
-    this.print(node.id);
-  }
+  if (node.id) this.print(node.id, false, false, undefined, "function");
 
-  if (this._buf._map) {
-    _params.call(this, node, false, node.id, parent);
-  } else {
-    _params.call(this, node, false);
-  }
-  if (hasPredicate) {
+  if (this._map) _params.call(this, node, false, node.id, parent);
+  else _params.call(this, node, false);
+  if (hasPredicate)
     _predicate.call(this, node as t.FunctionDeclaration | t.FunctionExpression);
-  }
 }
 
 export function FunctionExpression(
@@ -211,18 +192,12 @@ export function ArrowFunctionExpression(
   parent: ParentsOf<typeof node>,
 ) {
   if (node.async) {
-    this.word("async", true);
+    this.word("async", "keyword", true);
     this.space();
   }
 
   if (_shouldPrintArrowParamsParens.call(this, node)) {
-    _params.call(
-      this,
-      node,
-      true,
-      undefined,
-      this._buf._map ? parent : undefined,
-    );
+    _params.call(this, node, true, undefined, this._map ? parent : undefined);
   } else {
     this.print(node.params[0], true);
   }
@@ -233,7 +208,7 @@ export function ArrowFunctionExpression(
   // and thus there aren't two contiguous inner tokens.
   // We forcefully print inner comments here.
   this.printInnerComments();
-  this.token("=>");
+  this.token("=>", "keyword");
 
   this.space();
 
@@ -264,16 +239,6 @@ export function _shouldPrintArrowParamsParens(
   ) {
     return true;
   }
-
-  if (this.tokenMap) {
-    if (node.loc == null) return true;
-    if (this.tokenMap.findMatching(node, "(") !== null) return true;
-    const arrowToken = this.tokenMap.findMatching(node, "=>");
-    if (arrowToken?.loc == null) return true;
-    return arrowToken.loc.start.line !== node.loc.start.line;
-  }
-
-  if (this.format.retainLines) return true;
 
   return false;
 }

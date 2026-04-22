@@ -30,7 +30,7 @@ export function transform(ast: ParseResult) {
   if (fnNode.params.length > 3) throw "3+ args";
 
   const counters: Record<string, number> = {};
-  ((traverse as any).default as typeof traverse)(ast, {
+  traverse(ast, {
     // Replace function parameters
     Function(path) {
       path.node.params.forEach((param, i) => {
@@ -248,12 +248,11 @@ export function transform(ast: ParseResult) {
           t.jsxOpeningElement(tag, attrs, children.length === 0),
           children.length ? t.jsxClosingElement(tag) : null,
           children,
-          children.length === 0,
         ),
       );
     },
 
-    // Seperate chained instructions
+    // Separate chained instructions
     SequenceExpression({ node, parentPath }) {
       if (parentPath.isReturnStatement({ argument: node }))
         parentPath.replaceWithMultiple([

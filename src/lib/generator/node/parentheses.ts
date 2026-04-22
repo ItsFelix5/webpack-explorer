@@ -6,7 +6,7 @@ import {
 } from "@babel/types";
 import type * as t from "@babel/types";
 
-import { TokenContext } from "./index";
+import { TokenContext, __node } from ".";
 
 const PRECEDENCE = new Map([
   ["||", 0],
@@ -303,17 +303,12 @@ export function TSInferType(
   parent: any,
   parentId: number,
 ): boolean {
-  if (TSTypeOperator(node, parent, parentId)) {
-    return true;
-  }
-  if (
-    (parentId === __node("TSIntersectionType") ||
+  return (
+    TSTypeOperator(node, parent, parentId) ||
+    ((parentId === __node("TSIntersectionType") ||
       parentId === __node("TSUnionType")) &&
-    node.typeParameter.constraint != null
-  ) {
-    return true;
-  }
-  return false;
+      node.typeParameter.constraint != null)
+  );
 }
 
 export function TSTypeOperator(
@@ -401,18 +396,11 @@ export function SequenceExpression(
     (parentId === __node("OptionalMemberExpression") &&
       parent.property === node) ||
     parentId === __node("TemplateLiteral")
-  ) {
+  )
     return false;
-  }
-  if (parentId === __node("ClassDeclaration")) {
-    return true;
-  }
-  if (parentId === __node("ForOfStatement")) {
-    return parent.right === node;
-  }
-  if (parentId === __node("ExportDefaultDeclaration")) {
-    return true;
-  }
+  if (parentId === __node("ClassDeclaration")) return true;
+  if (parentId === __node("ForOfStatement")) return parent.right === node;
+  if (parentId === __node("ExportDefaultDeclaration")) return true;
 
   return !isStatement(parent);
 }
@@ -552,9 +540,7 @@ export function Identifier(
   tokenContext: number,
   getRawIdentifier: (node: t.Identifier) => string,
 ): boolean {
-  if (getRawIdentifier && getRawIdentifier(node) !== node.name) {
-    return false;
-  }
+  if (getRawIdentifier && getRawIdentifier(node) !== node.name) return false;
 
   // 13.15.2 AssignmentExpression RS: Evaluation
   // (fn) = function () {};
@@ -567,9 +553,8 @@ export function Identifier(
     if (
       (rightType === "FunctionExpression" || rightType === "ClassExpression") &&
       parent.right.id == null
-    ) {
+    )
       return true;
-    }
   }
 
   // fast path
@@ -603,9 +588,8 @@ export function Identifier(
           (TokenContext.expressionStatement |
             TokenContext.forInitHead |
             TokenContext.forInHead)
-      ) {
+      )
         return true;
-      }
       return (tokenContext & TokenContext.forOfHead) > 0;
     }
   }

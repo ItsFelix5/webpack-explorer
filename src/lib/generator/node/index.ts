@@ -1,8 +1,33 @@
 import * as parens from "./parentheses";
 import { VISITOR_KEYS } from "@babel/types";
 import type * as t from "@babel/types";
+import type Printer from "../printer";
+import * as generatorFunctions from "../generators";
 
-import { generatorInfosMap } from "../nodes";
+export const generatorInfosMap = new Map<
+  string,
+  [
+    (
+      this: Printer,
+      node: t.Node,
+      parent?: t.Node | null,
+      typeFallback: Token["type"],
+    ) => void,
+    number,
+    NodeHandler<boolean> | undefined,
+  ]
+>();
+
+let index = 0;
+for (const key of Object.keys(generatorFunctions).sort() as Exclude<
+  keyof typeof generatorFunctions,
+  `_${string}`
+>[]) {
+  if (key.startsWith("_")) continue;
+  generatorInfosMap.set(key, [generatorFunctions[key], index++, undefined]);
+}
+
+export const __node = (type: t.Node["type"]) => generatorInfosMap.get(type)[1];
 
 export const enum TokenContext {
   normal = 0,

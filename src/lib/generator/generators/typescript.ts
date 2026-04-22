@@ -1,9 +1,8 @@
 import type Printer from "../printer";
 import type * as t from "@babel/types";
-import * as charCodes from "../charcodes";
 import { _functionHead, _param, _parameters } from "./methods";
 import { _classMethodHead } from "./classes";
-import { _printTemplate } from "./template-literals";
+import { _printTemplate } from "./types";
 
 export function TSTypeAnnotation(
   this: Printer,
@@ -33,17 +32,6 @@ export function TSTypeParameterInstantiation(
 
   let printTrailingSeparator: boolean | null =
     parent.type === "ArrowFunctionExpression" && node.params.length === 1;
-  if (this.tokenMap && node.start != null && node.end != null) {
-    // Only force the trailing comma for pre-existing nodes if they
-    // already had a comma (either because they were multi-param, or
-    // because they had a trailing comma)
-    printTrailingSeparator &&= !!this.tokenMap.find(node, (t) =>
-      this.tokenMap!.matchesOriginal(t, ","),
-    );
-    // Preserve the trailing comma if it was there before
-    printTrailingSeparator ||= this.shouldPrintTrailingComma(">");
-  }
-
   this.printList(node.params, printTrailingSeparator);
   this.token(">");
 }
@@ -133,16 +121,7 @@ export function TSCallSignatureDeclaration(
 }
 
 function maybePrintTrailingCommaOrSemicolon(printer: Printer, node: t.Node) {
-  if (!printer.tokenMap || !node.start || !node.end) {
-    printer.semicolon();
-    return;
-  }
-
-  if (printer.tokenMap.endMatches(node, ",")) {
-    printer.token(",");
-  } else if (printer.tokenMap.endMatches(node, ";")) {
-    printer.semicolon();
-  }
+  printer.semicolon();
 }
 
 export function TSConstructSignatureDeclaration(
@@ -207,7 +186,7 @@ export function TSIndexSignature(this: Printer, node: t.TSIndexSignature) {
     this.space();
   }
   this.token("[");
-  _parameters.call(this, node.parameters, charCodes.rightSquareBracket);
+  _parameters.call(this, node.parameters, 93);
   this.print(node.typeAnnotation);
   maybePrintTrailingCommaOrSemicolon(this, node);
 }
@@ -279,7 +258,7 @@ function tsPrintFunctionOrConstructorType(
 
   this.print(typeParameters);
   this.token("(");
-  _parameters.call(this, parameters, charCodes.rightParenthesis);
+  _parameters.call(this, parameters, 41);
   this.space();
   const returnType = node.returnType;
 
@@ -334,7 +313,7 @@ export function TSArrayType(this: Printer, node: t.TSArrayType) {
 
 export function TSTupleType(this: Printer, node: t.TSTupleType) {
   this.token("[");
-  this.printList(node.elementTypes, this.shouldPrintTrailingComma("]"));
+  this.printList(node.elementTypes);
   this.token("]");
 }
 
@@ -369,15 +348,9 @@ function tsPrintUnionOrIntersectionType(
   node: t.TSUnionType | t.TSIntersectionType,
   sep: "|" | "&",
 ) {
-  let hasLeadingToken = 0;
-  if (printer.tokenMap?.startMatches(node, sep)) {
-    hasLeadingToken = 1;
-    printer.token(sep);
-  }
-
-  printer.printJoin(node.types, undefined, undefined, function (i) {
+  printer.printJoin(node.types, undefined, undefined, function () {
     this.space();
-    this.token(sep, undefined, i + hasLeadingToken);
+    this.token(sep);
     this.space();
   });
 }
@@ -605,14 +578,7 @@ export function TSEnumDeclaration(this: Printer, node: t.TSEnumDeclaration) {
 
 export function TSEnumBody(this: Printer, node: t.TSEnumBody) {
   printBraced(this, node, () =>
-    this.printList(
-      node.members,
-      this.shouldPrintTrailingComma("}") ?? false,
-      true,
-      true,
-      undefined,
-      true,
-    ),
+    this.printList(node.members, false, true, true, undefined, true),
   );
 }
 
@@ -708,7 +674,7 @@ export function TSNonNullExpression(
 ) {
   this.print(node.expression);
   this.token("!");
-  this.setLastChar(charCodes.exclamationMark);
+  this.setLastChar(33);
 }
 
 export function TSExportAssignment(this: Printer, node: t.TSExportAssignment) {
@@ -739,7 +705,7 @@ function tsPrintSignatureDeclarationBase(this: Printer, node: any) {
   const parameters = node.params;
   this.print(typeParameters);
   this.token("(");
-  _parameters.call(this, parameters, charCodes.rightParenthesis);
+  _parameters.call(this, parameters, 41);
   this.print(node.returnType);
 }
 
@@ -788,16 +754,6 @@ function printModifiersList(
   for (const modifier of modifiers) {
     if (modifier) modifiersSet.add(modifier);
   }
-
-  printer.tokenMap?.find(node, (tok) => {
-    if (modifiersSet.has(tok.value)) {
-      printer.token(tok.value);
-      printer.space();
-      modifiersSet.delete(tok.value);
-      return modifiersSet.size === 0;
-    }
-    return false;
-  });
 
   for (const modifier of modifiersSet) {
     printer.word(modifier);

@@ -1,5 +1,5 @@
 import { parse } from "@babel/parser";
-import traverse, { Binding } from "@babel/traverse";
+import traverse, { type Binding } from "@babel/traverse";
 
 export function getReferences(code: string) {
   const ast = parse(code, { plugins: ["jsx"] });
@@ -10,7 +10,7 @@ export function getReferences(code: string) {
   const visited = new Set<Binding>();
   let counter = 0;
 
-  ((traverse as any).default as typeof traverse)(ast as any, {
+  traverse(ast as any, {
     Scope(path) {
       const allBindings = path.scope.getAllBindings();
       for (const binding of Object.values(allBindings)) {

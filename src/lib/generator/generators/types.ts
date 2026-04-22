@@ -1,27 +1,20 @@
 import type Printer from "../printer";
 import { isAssignmentPattern, isIdentifier } from "@babel/types";
-import type * as t from "@babel/types";
+import * as t from "@babel/types";
 import jsesc from "jsesc";
-import * as charCodes from "../charcodes";
 import { _methodHead } from "./methods";
+import type { Token } from "src/types";
 
-let lastRawIdentResult: string = "";
-export function _getRawIdentifier(this: Printer, node: t.Identifier) {
-  const { name } = node;
-  const token = this.tokenMap!.find(node, (tok) => tok.value === name);
-  if (token) {
-    lastRawIdentResult = this._originalCode!.slice(token.start, token.end);
-    return lastRawIdentResult;
-  }
-  return (lastRawIdentResult = node.name);
-}
-
-export function Identifier(this: Printer, node: t.Identifier) {
-  if (this._buf._map) {
+export function Identifier(
+  this: Printer,
+  node: t.Identifier,
+  parent: t.Identifier,
+  type: Token["type"],
+) {
+  if (this._map)
     this.sourceIdentifierName(node.loc?.identifierName || node.name);
-  }
 
-  this.word(this.tokenMap ? lastRawIdentResult : node.name);
+  this.word(node.name, type ?? "variable");
 }
 
 export function ArgumentPlaceholder(this: Printer) {
@@ -43,14 +36,7 @@ export function ObjectExpression(this: Printer, node: t.ObjectExpression) {
   if (props.length) {
     const oldNoLineTerminatorAfterNode = this.enterDelimited();
     this.space();
-    this.printList(
-      props,
-      this.shouldPrintTrailingComma("}"),
-      true,
-      true,
-      undefined,
-      true,
-    );
+    this.printList(props, null, true, true, undefined, true);
     this.space();
     this._noLineTerminatorAfterNode = oldNoLineTerminatorAfterNode;
   }
@@ -117,8 +103,8 @@ export function ArrayExpression(this: Printer, node: t.ArrayExpression) {
     if (elem) {
       if (i > 0) this.space();
       this.print(elem, undefined, true);
-      if (i < len - 1 || this.shouldPrintTrailingComma("]")) {
-        this.tokenChar(charCodes.comma, i);
+      if (i < len - 1) {
+        this.tokenChar(44, "punctuation");
       }
     } else {
       // If the array expression ends with a hole, that hole
@@ -126,7 +112,7 @@ export function ArrayExpression(this: Printer, node: t.ArrayExpression) {
       // two (or more) holes, we need to write out two (or more)
       // commas so that the resulting code is interpreted with
       // both (all) of the holes.
-      this.tokenChar(charCodes.comma, i);
+      this.tokenChar(44, "punctuation");
     }
   }
 
@@ -138,80 +124,84 @@ export function ArrayExpression(this: Printer, node: t.ArrayExpression) {
 export { ArrayExpression as ArrayPattern };
 
 export function RegExpLiteral(this: Printer, node: t.RegExpLiteral) {
-  this.word(`/${node.pattern}/${node.flags}`, false);
+  this.word(`/${node.pattern}/${node.flags}`, "regex", false);
 }
 
 export function BooleanLiteral(this: Printer, node: t.BooleanLiteral) {
-  this.word(node.value ? "true" : "false");
+  this.word(node.value ? "true" : "false", "boolean");
 }
 
 export function NullLiteral(this: Printer) {
-  this.word("null");
+  this.word("null", "builtin");
 }
 
 export function NumericLiteral(this: Printer, node: t.NumericLiteral) {
-  const raw = this.getPossibleRaw(node);
-  const opts = this.format.jsescOption;
-  const value = node.value;
-  const str = value + "";
-  if (opts.numbers) {
-    this.number(jsesc(value, opts), value);
-  } else if (raw == null) {
-    this.number(str, value); // normalize
-  } else if (this.format.minified) {
-    this.number(raw.length < str.length ? raw : str, value);
-  } else {
-    this.number(raw, value);
-  }
+  const str = this.getPossibleRaw(node) ?? node.value + "";
+  this.word(str, "number");
+
+  // Integer tokens need special handling because they cannot have '.'s inserted immediately after them.
+  if (
+    Number.isInteger(node.value) &&
+    !/^(0[box]|.*[eE].*|.*\.0+|.*\.)$/.test(str)
+  )
+    this.setLastChar(-2);
 }
 
 export function StringLiteral(this: Printer, node: t.StringLiteral) {
   const raw = this.getPossibleRaw(node);
-  if (!this.format.minified && raw !== undefined) {
-    this.token(raw);
+  if (raw !== undefined) {
+    this.token(raw, "string");
     return;
   }
 
-  const val = jsesc(node.value, this.format.jsescOption);
+  const val = jsesc(node.value, {
+    quotes: "double",
+    wrap: true,
+    minimal: true,
+  });
 
-  this.token(val);
+  this.token(val, "string");
+}
+
+export function TaggedTemplateExpression(
+  this: Printer,
+  node: t.TaggedTemplateExpression,
+) {
+  this.print(node.tag);
+  this.print(node.typeArguments);
+  this.print(node.quasi);
+}
+
+export type TemplateLiteralBase = t.Node & {
+  quasis: t.TemplateElement[];
+};
+
+export function _printTemplate<T extends t.Node>(
+  this: Printer,
+  node: TemplateLiteralBase,
+  substitutions: T[],
+) {
+  const quasis = node.quasis;
+  this.token("`", "string");
+  for (let i = 0; i < quasis.length - 1; i++) {
+    this.token(quasis[i].value.raw, "string", true);
+    this.token("${", "keyword");
+    this.print(substitutions[i]);
+    this.token("}", "keyword");
+  }
+
+  this.token(quasis[quasis.length - 1].value.raw, "string");
+  this.token("`", "string");
+}
+
+export function TemplateLiteral(this: Printer, node: t.TemplateLiteral) {
+  _printTemplate.call(this, node, node.expressions);
 }
 
 export function BigIntLiteral(this: Printer, node: t.BigIntLiteral) {
-  const raw = this.getPossibleRaw(node);
-  if (!this.format.minified && raw !== undefined) {
-    this.word(raw);
-    return;
-  }
-  this.word(node.value + "n");
+  this.word(this.getPossibleRaw(node) ?? node.value + "n", "number");
 }
 
-// Hack pipe operator
-const validTopicTokenSet = new Set<string | undefined>([
-  "^^",
-  "@@",
-  "^",
-  "%",
-  "#",
-]);
-export function TopicReference(this: Printer) {
-  const { topicToken } = this.format;
-
-  if (validTopicTokenSet.has(topicToken)) {
-    this.token(topicToken!);
-  } else {
-    const givenTopicTokenJSON = JSON.stringify(topicToken);
-    const validTopics = Array.from(validTopicTokenSet, (v) =>
-      JSON.stringify(v),
-    );
-    throw new Error(
-      `The "topicToken" generator option must be one of ` +
-        `${validTopics.join(", ")} (${givenTopicTokenJSON} received instead).`,
-    );
-  }
-}
-
-// discard binding
 export function VoidPattern(this: Printer) {
   this.word("void");
 }

@@ -29,7 +29,7 @@ export function Program(this: Printer, node: t.Program) {
 }
 
 export function BlockStatement(this: Printer, node: t.BlockStatement) {
-  this.token("{");
+  this.token("{", "bracket");
   const oldNoLineTerminatorAfterNode = this.enterDelimited();
 
   const directivesLen = node.directives?.length;
@@ -58,7 +58,7 @@ const unescapedDoubleQuoteRE = /(?:^|[^\\])(?:\\\\)*"/;
 
 export function DirectiveLiteral(this: Printer, node: t.DirectiveLiteral) {
   const raw = this.getPossibleRaw(node);
-  if (!this.format.minified && raw !== undefined) {
+  if (raw !== undefined) {
     this.token(raw);
     return;
   }
@@ -85,7 +85,7 @@ export function InterpreterDirective(
   this: Printer,
   node: t.InterpreterDirective,
 ) {
-  this.token(`#!${node.value}`);
+  this.token(`#!${node.value}`, "comment");
   this._newline();
 }
 

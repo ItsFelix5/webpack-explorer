@@ -57,7 +57,7 @@ export async function getAST(id: number) {
 }
 
 export async function toCode(ast: ParseResult) {
-  return ((generate as any).default as typeof generate)(ast, {
+  return generate(ast, {
     jsescOption: { minimal: true },
   }).code;
 }

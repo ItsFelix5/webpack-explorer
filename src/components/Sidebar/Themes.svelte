@@ -1,10 +1,16 @@
 <script lang="ts">
   import { Sun, Moon } from "@lucide/svelte";
-  import themes from "../../lib/themes";
   import { getContext } from "svelte";
   import type { App, ThemeName } from "src/types";
 
   let ctx: App = getContext("app");
+
+  const themes = {
+    "one-dark-pro": {
+      name: "One Dark Pro",
+      dark: true,
+    },
+  };
 </script>
 
 {#each Object.entries(themes) as [id, { name, dark }]}

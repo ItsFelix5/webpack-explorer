@@ -1,24 +1,26 @@
-import type themes from "./lib/themes";
-
 export type Token = {
   content: string;
   offset: number;
   type:
-    | "comment"
+    | "" //
+    | "comment" //
     | "string"
-    | "number"
-    | "boolean"
-    | "keyword"
-    | "function"
-    | "variable"
+    | "regex" //
+    | "number" //
+    | "boolean" //
+    | "keyword" //
+    | "function" //
+    | "variable" //
+    | "builtin" //
     | "constant"
-    | "operator"
+    | "operator" //
+    | "bracket" //
     | "property"
-    | "indent";
+    | "indent" //
+    | "punctuation"; //
 };
 
-export type ThemeName = keyof typeof themes;
-export type Theme = (typeof themes)[ThemeName];
+export type ThemeName = "one-dark-pro";
 
 export type App = {
   openModule?: number;
