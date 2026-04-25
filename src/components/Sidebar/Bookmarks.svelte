@@ -1,17 +1,22 @@
 <script lang="ts">
   import { Bookmark, Package, PackageOpen } from "@lucide/svelte";
-  import { files } from "../../lib/data";
   import { getContext } from "svelte";
   import { flip } from "svelte/animate";
   import type { App } from "src/types";
+  import { modules } from "@data";
 
   let ctx: App = getContext("app");
 
   let expanded = $state<(string | number)[]>([]);
+  let files = $derived(
+    Object.entries($modules).filter(([_, mods]) =>
+      Object.keys(mods).some((m) => ctx.bookmarks[Number(m)]?.length),
+    ),
+  );
 </script>
 
-{#if Object.entries(files).some( ([_, mods]) => Object.keys(mods).some((m) => ctx.bookmarks[Number(m)]?.length), )}
-  {#each Object.entries(files).filter( ([_, mods]) => Object.keys(mods).some((m) => ctx.bookmarks[Number(m)]?.length), ) as file}
+{#if files.length}
+  {#each files as file}
     <button
       style="margin: 5px 0 0 0;"
       class="sidebar-item"
@@ -28,7 +33,7 @@
       {file[0]}
     </button>
     {#if expanded.includes(file[0])}
-      {#each Object.keys(file[1])
+      {#each file[1]
         .map((s) => Number(s))
         .filter((m) => ctx.bookmarks[m]?.length) as module}
         <button

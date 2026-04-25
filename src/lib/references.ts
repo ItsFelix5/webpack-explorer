@@ -1,9 +1,7 @@
-import { parse } from "@babel/parser";
+import type { ParseResult } from "@babel/parser";
 import traverse, { type Binding } from "@babel/traverse";
 
-export function getReferences(code: string) {
-  const ast = parse(code, { plugins: ["jsx"] });
-
+export function getReferences(ast: ParseResult) {
   const tokenMap = new Map<number, number>();
   const definitions = new Map<number, number>();
   const usages = new Map<number, number[]>();

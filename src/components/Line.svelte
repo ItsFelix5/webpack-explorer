@@ -2,7 +2,6 @@
   import { getContext } from "svelte";
   import type { App, Token } from "src/types";
   import { Bookmark } from "@lucide/svelte";
-  import { searchRegex } from "../lib/data";
 
   let ctx: App = getContext("app");
   let {
@@ -13,13 +12,7 @@
 </script>
 
 <div class="line">
-  <span
-    class="lineNumber"
-    class:highlight-line={ctx.search.query &&
-      line
-        .map((token) => token.content)
-        .join("")
-        .match(searchRegex(ctx.search))}
+  <span class="lineNumber"
     ><span
       style:color={ctx.bookmarks[ctx.openModule!]?.includes(i)
         ? "var(--bookmark)"
@@ -72,13 +65,3 @@
           ctx.mappings[ctx.openModule!]?.[reference]) || token.content}</span
     >{/each}
 </div>
-
-<style>
-  .highlight-line {
-    color: var(--text);
-  }
-
-  .highlight {
-    background-color: var(--highlight);
-  }
-</style>

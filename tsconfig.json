@@ -11,6 +11,9 @@
     "allowJs": true,
     "checkJs": true,
     "moduleDetection": "force",
+    "paths": {
+      "@data": ["src/lib/mock"],
+    },
   },
   "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"],
 }

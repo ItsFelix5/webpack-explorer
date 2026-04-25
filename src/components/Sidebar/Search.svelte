@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext } from "svelte";
   import type { App } from "src/types";
-  import { search } from "../../lib/data";
+  import { search } from "../../lib/code";
   import { CaseSensitive, Regex, WholeWord } from "@lucide/svelte";
 
   let ctx: App = getContext("app");
@@ -103,9 +103,5 @@
     border-radius: 4px;
     background-color: var(--bg);
     color: var(--text);
-  }
-
-  .button {
-    flex-shrink: 0;
   }
 </style>

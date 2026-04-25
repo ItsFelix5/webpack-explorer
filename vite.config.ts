@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { cpSync } from "fs";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     svelte(),
     {
@@ -15,4 +15,10 @@ export default defineConfig({
       input: "index.html",
     },
   },
-});
+  resolve: {
+    alias: {
+      "@": "/src",
+      "@data": mode === "development" ? "/src/lib/mock" : "/src/lib/interface",
+    },
+  },
+}));

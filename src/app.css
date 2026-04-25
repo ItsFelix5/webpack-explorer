@@ -60,7 +60,6 @@ body.ctrl .module:hover {
   color: var(--text);
   border-bottom: 1px solid var(--border);
   flex: 0 0 auto;
-  user-select: none;
   text-transform: capitalize;
 }
 

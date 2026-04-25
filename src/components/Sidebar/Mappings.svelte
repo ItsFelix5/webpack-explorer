@@ -1,16 +1,21 @@
 <script lang="ts">
   import { Package, PackageOpen, Trash } from "@lucide/svelte";
-  import { files } from "../../lib/data";
   import { getContext } from "svelte";
   import type { App } from "src/types";
+  import { modules } from "@data";
 
   let ctx: App = getContext("app");
 
   let expanded = $state<(string | number)[]>([]);
+  let files = $derived(
+    Object.entries($modules).filter(([_, mods]) =>
+      Object.keys(mods).some((m) => ctx.mappings[Number(m)]),
+    ),
+  );
 </script>
 
-{#if Object.values(files).some( (mods) => Object.keys(mods).some((m) => ctx.mappings[Number(m)]), )}
-  {#each Object.entries(files).filter( ([_, mods]) => Object.keys(mods).some((m) => ctx.mappings[Number(m)]), ) as file}
+{#if files}
+  {#each files as file}
     <button
       style="margin: 5px 0 0 0;"
       class="sidebar-item"
@@ -27,7 +32,7 @@
       {file[0]}
     </button>
     {#if expanded.includes(file[0])}
-      {#each Object.keys(file[1])
+      {#each file[1]
         .map((m) => Number(m))
         .filter((m) => ctx.mappings[m]) as module}
         <button

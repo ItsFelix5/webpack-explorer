@@ -1,12 +1,16 @@
 <script lang="ts">
   import { Package, PackageOpen } from "@lucide/svelte";
-  import { files } from "../../lib/data";
+  import { modules } from "@data";
   import { getContext } from "svelte";
   import type { App } from "src/types";
 
   let ctx: App = getContext("app");
 
-  let expanded = $state<string[]>([]);
+  let expanded = $state<string[]>([
+    Object.entries($modules).find(([_, m]) =>
+      m.includes(ctx.openModule!),
+    )?.[0] || "",
+  ]);
   let draggingVertical = $state(false);
   let height = $state(220);
 </script>
@@ -23,7 +27,7 @@
 />
 
 <div class="modules">
-  {#each Object.entries(files) as file}
+  {#each Object.entries($modules) as file}
     <button
       style="margin: 5px 0 0 0;"
       class="sidebar-item"
@@ -40,7 +44,7 @@
       {file[0]}
     </button>
     {#if expanded.includes(file[0])}
-      {#each Object.keys(file[1]).map((m) => Number(m)) as module}
+      {#each file[1].map((m) => Number(m)) as module}
         <button
           class="sidebar-item"
           onclick={() => (ctx.openModule = module)}

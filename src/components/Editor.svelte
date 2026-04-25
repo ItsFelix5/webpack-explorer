@@ -1,33 +1,40 @@
 <script lang="ts">
-  import { getCode, getAST, toCode } from "../lib/data";
   import { transform } from "../lib/transformer";
   import { getContext, untrack } from "svelte";
   import { tokenize } from "../lib/highlight";
   import type { App } from "src/types";
   import { getReferences } from "../lib/references";
   import Line from "./Line.svelte";
+  import { code } from "@data";
+  import { parse } from "@babel/parser";
 
   let ctx: App = getContext("app");
   $effect(() => {
     ctx.openModule;
     ctx.rewrite;
     ctx.theme;
-    untrack(() => {
+    untrack(async () => {
       ctx.highlighted = undefined;
       ctx.tokens = [];
-      console.time("tokenize");
-      getAST(ctx.openModule!)
-        .then(async (ast) => {
-          if (ctx.rewrite) {
-            const transformed = transform(ast);
-            const code = await toCode(transformed);
-            ctx.references = getReferences(code);
-            tokenize(getCode(ctx.openModule!), transformed, ctx.tokens);
-          } else {
-            tokenize(getCode(ctx.openModule!), ast, ctx.tokens);
-          }
-        })
-        .then(() => console.timeEnd("tokenize"));
+      console.time("full");
+      console.time("get");
+      const fn = code.get(ctx.openModule! + "")!;
+      const ast = parse(/^\s*function\s*\(/.test(fn) ? `(${fn})` : fn);
+      console.timeEnd("get");
+      if (ctx.rewrite) {
+        console.time("transform");
+        const transformed = transform(ast);
+        console.timeEnd("transform");
+        console.time("references");
+        ctx.references = getReferences(ast);
+        console.timeEnd("references");
+        console.time("tokenize");
+        tokenize(fn, transformed, ctx.tokens);
+        console.timeEnd("tokenize");
+      } else {
+        tokenize(fn, ast, ctx.tokens);
+      }
+      console.timeEnd("full");
     });
   });
 </script>

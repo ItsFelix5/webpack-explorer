@@ -7,6 +7,7 @@
     BookAIcon,
     PaletteIcon,
     SettingsIcon,
+    RefreshCwIcon,
   } from "@lucide/svelte";
   import Modules from "./Modules.svelte";
   import Search from "./Search.svelte";
@@ -15,6 +16,7 @@
   import Bookmarks from "./Bookmarks.svelte";
   import Mappings from "./Mappings.svelte";
   import References from "./References.svelte";
+  import { loadModules } from "@data";
 
   const tabs = {
     modules: CodeIcon,
@@ -40,7 +42,16 @@
 
 <aside style:width={width + "px"}>
   <div id="content">
-    <div class="header">{tab}</div>
+    <div class="header">
+      {tab}{#if tab == "modules"}
+        <RefreshCwIcon
+          class="button"
+          style="float: right;"
+          onclick={loadModules}
+          size={16}
+        />
+      {/if}
+    </div>
     {#if tab == "modules"}
       <Modules />{:else if tab == "search"}
       <Search />{:else if tab == "references"}
@@ -72,6 +83,7 @@
     width: auto;
     display: flex;
     flex-direction: column;
+    user-select: none;
   }
 
   #content {
