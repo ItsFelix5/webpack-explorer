@@ -59,7 +59,7 @@ const unescapedDoubleQuoteRE = /(?:^|[^\\])(?:\\\\)*"/;
 export function DirectiveLiteral(this: Printer, node: t.DirectiveLiteral) {
   const raw = this.getPossibleRaw(node);
   if (raw !== undefined) {
-    this.token(raw);
+    this.token(raw, "string");
     return;
   }
 
@@ -70,9 +70,9 @@ export function DirectiveLiteral(this: Printer, node: t.DirectiveLiteral) {
   // e.g. "us\x65 strict" (\x65 is e) is not a "use strict" directive.
 
   if (!unescapedDoubleQuoteRE.test(value)) {
-    this.token(`"${value}"`);
+    this.token(`"${value}"`, "string");
   } else if (!unescapedSingleQuoteRE.test(value)) {
-    this.token(`'${value}'`);
+    this.token(`'${value}'`, "string");
   } else {
     throw new Error(
       "Malformed AST: it is not possible to print a directive containing" +

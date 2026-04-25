@@ -363,12 +363,28 @@ class Printer {
 
     this._last = -1;
 
-    while (this._tokens.length - 1 < position.line) this._tokens.push([]);
-    this._tokens[position.line - 1].push({
-      content: str,
-      offset: this._offset,
-      type,
-    });
+    while (this._tokens.length - 1 < position.line + str.split("\n").length - 1)
+      this._tokens.push([]);
+    let i,
+      lineIndex = position.line - 1,
+      start = 0;
+
+    while ((i = str.indexOf("\n", start)) !== -1) {
+      this._tokens[lineIndex].push({
+        content: str.slice(start, i + 1),
+        offset: this._offset + start,
+        type,
+      });
+
+      lineIndex++;
+      start = i + 1;
+    }
+    if (start < str.length)
+      this._tokens[lineIndex].push({
+        content: str.slice(start),
+        offset: this._offset + start,
+        type,
+      });
 
     this._str += str;
     this._offset += len;
@@ -385,14 +401,12 @@ class Printer {
       sourcePos.identifierName = undefined;
     }
 
-    let i = str.indexOf("\n");
+    i = str.indexOf("\n");
     let last = 0;
 
     // If the string starts with a newline char, then adding a mark is redundant.
     // This catches both "no newlines" and "newline after several chars".
-    if (this._map && i !== 0) {
-      this.mark(position, line, column, identifierName);
-    }
+    if (this._map && i !== 0) this.mark(position, line, column, identifierName);
 
     // Now, find each remaining newline char in the string.
     while (i !== -1) {

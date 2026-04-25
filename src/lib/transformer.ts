@@ -4,6 +4,7 @@ import * as t from "@babel/types";
 import type { Scope } from "@babel/traverse";
 
 export function transform(ast: ParseResult) {
+  console.time("Transform");
   if (ast.program.body.length !== 1) throw "Expected exactly 1 statement";
   const node = ast.program.body[0];
   let fnNode:
@@ -314,4 +315,5 @@ function preventDestructureRename(path: t.ObjectPattern, scope: Scope) {
       prop.shorthand = true;
     } else prop.shorthand = false;
   });
+  console.timeEnd("Transform");
 }

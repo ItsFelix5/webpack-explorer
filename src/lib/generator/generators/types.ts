@@ -190,7 +190,7 @@ export function _printTemplate<T extends t.Node>(
     this.token("}", "keyword");
   }
 
-  this.token(quasis[quasis.length - 1].value.raw, "string");
+  this.token(quasis[quasis.length - 1].value.raw, "string", true);
   this.token("`", "string");
 }
 

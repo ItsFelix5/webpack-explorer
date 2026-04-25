@@ -11,7 +11,7 @@ export const generatorInfosMap = new Map<
       this: Printer,
       node: t.Node,
       parent?: t.Node | null,
-      typeFallback: Token["type"],
+      typeFallback?: Token["type"],
     ) => void,
     number,
     NodeHandler<boolean> | undefined,
