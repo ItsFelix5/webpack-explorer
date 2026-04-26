@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { transform } from "../lib/transformer";
+  import { transform } from "@lib/transformer";
   import { getContext, untrack } from "svelte";
-  import { tokenize } from "../lib/highlight";
   import type { App } from "src/types";
-  import { getReferences } from "../lib/references";
+  import { getReferences } from "@lib/references";
   import Line from "./Line.svelte";
   import { code } from "@data";
   import { parse } from "@babel/parser";
+  import Printer from "@lib/generator/printer";
 
   let ctx: App = getContext("app");
   $effect(() => {
@@ -23,17 +23,22 @@
       console.timeEnd("get");
       if (ctx.rewrite) {
         console.time("transform");
-        const transformed = transform(ast);
+        transform(ast);
         console.timeEnd("transform");
         console.time("references");
         ctx.references = getReferences(ast);
         console.timeEnd("references");
-        console.time("tokenize");
-        tokenize(fn, transformed, ctx.tokens);
-        console.timeEnd("tokenize");
-      } else {
-        tokenize(fn, ast, ctx.tokens);
       }
+      console.log(ast);
+      console.time("tokenize");
+      //const map = new GenMapping()
+      //setSourceContent(map, "", fn);
+      const printer = new Printer(null);
+      printer.print(ast);
+      if (printer._queuedChar !== 32) printer._flush();
+
+      ctx.tokens.push(...printer.tokens);
+      console.timeEnd("tokenize");
       console.timeEnd("full");
     });
   });

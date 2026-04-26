@@ -1,11 +1,23 @@
 <script lang="ts">
   import { getContext } from "svelte";
   import type { App } from "src/types";
-  import { search } from "../../lib/code";
+  import { code } from "@data";
   import { CaseSensitive, Regex, WholeWord } from "@lucide/svelte";
 
   let ctx: App = getContext("app");
   let inputEl: HTMLInputElement;
+  let query = $state("");
+  let regex = $state(false);
+  let wholeWord = $state(false);
+  let caseSensitive = $state(false);
+  let filter = $state("");
+
+  let search = $derived.by(() => {
+    let res = query;
+    if (!regex) res = res.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (wholeWord) res = `\\b${res}\\b`;
+    return new RegExp(res, !caseSensitive ? "i" : "");
+  });
 </script>
 
 <svelte:window
@@ -24,7 +36,7 @@
 <input
   type="text"
   placeholder="Search modules..."
-  bind:value={ctx.search.query}
+  bind:value={query}
   bind:this={inputEl}
   class="search-input"
   autofocus
@@ -35,27 +47,27 @@
     type="text"
     placeholder="Filter modules"
     class="filter"
-    bind:value={ctx.search.filter}
+    bind:value={filter}
   />
   <WholeWord
-    class={"button" + (ctx.search.wholeWord ? " selected" : "")}
-    onclick={() => (ctx.search.wholeWord = !ctx.search.wholeWord)}
+    class={"button" + (wholeWord ? " selected" : "")}
+    onclick={() => (wholeWord = !wholeWord)}
     size={16}
   />
   <CaseSensitive
-    class={"button" + (ctx.search.caseSensitive ? " selected" : "")}
-    onclick={() => (ctx.search.caseSensitive = !ctx.search.caseSensitive)}
+    class={"button" + (caseSensitive ? " selected" : "")}
+    onclick={() => (caseSensitive = !caseSensitive)}
     size={16}
   />
   <Regex
-    class={"button" + (ctx.search.regex ? " selected" : "")}
-    onclick={() => (ctx.search.regex = !ctx.search.regex)}
+    class={"button" + (regex ? " selected" : "")}
+    onclick={() => (regex = !regex)}
     size={16}
   />
 </div>
 
-{#if ctx.search.query && ctx.search.query.length >= 2}
-  {@const results = search(ctx.search)}
+{#if query && query.length >= 2}
+  {@const results: any[] = []}
   {#if results.length === 0}
     <div class="hint">No results found</div>
   {:else}
@@ -71,8 +83,8 @@
   {/if}
 {:else}
   <div class="hint">
-    Type at least 2 characters to search. Keep in mind this searches original
-    code
+    Type at least 2 characters to search. Keep in mind that this searches
+    original code
   </div>
 {/if}
 

@@ -85,7 +85,7 @@ export type PrintJoinOptions = PrintListOptions & {
 };
 class Printer {
   constructor(map: GenMapping | null) {
-    this._map = map;
+    this.map = map;
   }
 
   enterDelimited() {
@@ -100,16 +100,16 @@ class Printer {
 
   _currentNode: t.Node | null = null;
   _currentTypeId: number | null = null;
-  _indent: number = 0;
+  indent: number = 0;
   _noLineTerminator: boolean = false;
   _noLineTerminatorAfterNode: t.Node | null = null;
   _printedComments = new Set<t.Comment>();
   _lastCommentLine = 0;
   _innerCommentsState = INNER_COMMENTS_STATE.DISALLOWED;
 
-  _map: GenMapping | null = null;
-  _str = "";
-  _tokens: OutputToken[][] = [];
+  map: GenMapping | null = null;
+  str = "";
+  tokens: OutputToken[][] = [];
   _offset = 0;
   _last = 0;
   _canMarkIdName = true;
@@ -128,20 +128,6 @@ class Printer {
     line: undefined,
     column: undefined,
   };
-
-  /**
-   * Increment indent size.
-   */
-  indent(): void {
-    this._indent += 2;
-  }
-
-  /**
-   * Decrement indent size.
-   */
-  dedent(): void {
-    this._indent -= 2;
-  }
 
   /**
    * Add a semicolon to the buffer.
@@ -299,7 +285,7 @@ class Printer {
   }
 
   source(prop: "start" | "end", loc: SourceLocation | undefined): void {
-    if (!loc || !this._map) return;
+    if (!loc || !this.map) return;
 
     this._normalizePosition(prop, loc, 0);
   }
@@ -311,7 +297,7 @@ class Printer {
   ): void {
     if (!loc) return;
 
-    if (!this._map) return;
+    if (!this.map) return;
     this._normalizePosition(prop, loc, columnOffset);
   }
 
@@ -363,14 +349,14 @@ class Printer {
 
     this._last = -1;
 
-    while (this._tokens.length - 1 < position.line + str.split("\n").length - 1)
-      this._tokens.push([]);
+    while (this.tokens.length - 1 < position.line + str.split("\n").length - 1)
+      this.tokens.push([]);
     let i,
       lineIndex = position.line - 1,
       start = 0;
 
     while ((i = str.indexOf("\n", start)) !== -1) {
-      this._tokens[lineIndex].push({
+      this.tokens[lineIndex].push({
         content: str.slice(start, i + 1),
         offset: this._offset + start,
         type,
@@ -380,16 +366,16 @@ class Printer {
       start = i + 1;
     }
     if (start < str.length)
-      this._tokens[lineIndex].push({
+      this.tokens[lineIndex].push({
         content: str.slice(start),
         offset: this._offset + start,
         type,
       });
 
-    this._str += str;
+    this.str += str;
     this._offset += len;
 
-    if (!maybeNewline && !this._map) {
+    if (!maybeNewline && !this.map) {
       position.column += len;
       return;
     }
@@ -406,7 +392,7 @@ class Printer {
 
     // If the string starts with a newline char, then adding a mark is redundant.
     // This catches both "no newlines" and "newline after several chars".
-    if (this._map && i !== 0) this.mark(position, line, column, identifierName);
+    if (this.map && i !== 0) this.mark(position, line, column, identifierName);
 
     // Now, find each remaining newline char in the string.
     while (i !== -1) {
@@ -419,8 +405,8 @@ class Printer {
       // When manually adding multi-line content (such as a comment), `line` will be `undefined`.
       if (last < len && line !== undefined) {
         line++;
-        if (this._map) {
-          maybeAddMapping(this._map, {
+        if (this.map) {
+          maybeAddMapping(this.map, {
             generated: position,
             source: "",
             original: {
@@ -456,11 +442,11 @@ class Printer {
 
     const position = this._position;
     if (char !== 10) {
-      if (this._map) {
+      if (this.map) {
         const sourcePos = this._sourcePosition;
         if (useSourcePos && sourcePos?.line && sourcePos?.column) {
           if (char === 32 || !sourcePos.identifierName)
-            maybeAddMapping(this._map, {
+            maybeAddMapping(this.map, {
               generated: position,
               source: "",
               original: {
@@ -469,7 +455,7 @@ class Printer {
               },
             });
           else
-            maybeAddMapping(this._map, {
+            maybeAddMapping(this.map, {
               name: sourcePos.identifierName,
               generated: position,
               source: "",
@@ -479,7 +465,7 @@ class Printer {
               },
             });
         } else
-          maybeAddMapping(this._map, {
+          maybeAddMapping(this.map, {
             generated: position,
           });
 
@@ -493,21 +479,21 @@ class Printer {
       position.column = 0;
     }
 
-    while (this._tokens.length - 1 < position.line) this._tokens.push([]);
+    while (this.tokens.length - 1 < position.line) this.tokens.push([]);
     if (str != "\n")
-      this._tokens[position.line - 1].push({
+      this.tokens[position.line - 1].push({
         content: str,
         offset: this._offset,
         type,
       });
 
-    this._str += str;
+    this.str += str;
     this._offset += repeat;
     this._position.column += repeat;
   }
 
   _maybeIndent(): void {
-    const indent = this.endsWith(10) ? this._indent : 0;
+    const indent = this.endsWith(10) ? this.indent * 2 : 0;
     for (let i = 0; i < indent; i += 2)
       this._appendChar(-1, "indent", 2, false);
   }
@@ -609,7 +595,7 @@ class Printer {
 
     if (shouldPrintParens) {
       this.token("(");
-      if (indentParenthesized) this.indent();
+      if (indentParenthesized) this.indent++;
       this._innerCommentsState = INNER_COMMENTS_STATE.DISALLOWED;
       if (!resetTokenContext) oldTokenContext = this.tokenContext;
       if (oldTokenContext & TokenContext.forInOrInitHeadAccumulate)
@@ -635,7 +621,7 @@ class Printer {
     if (shouldPrintParens) {
       this._printTrailingComments(node, parent);
       if (indentParenthesized) {
-        this.dedent();
+        this.indent--;
         this.newline();
       }
       this.token(")");
@@ -687,7 +673,7 @@ class Printer {
   ) {
     if (!nodes?.length) return;
 
-    if (indent) this.indent();
+    if (indent) this.indent++;
 
     const len = nodes.length;
     for (let i = 0; i < len; i++) {
@@ -730,14 +716,14 @@ class Printer {
       }
     }
 
-    if (indent) this.dedent();
+    if (indent) this.indent--;
   }
 
   printAndIndentOnComments(node: t.Node) {
     const indent = node.leadingComments && node.leadingComments.length > 0;
-    if (indent) this.indent();
+    if (indent) this.indent++;
     this.print(node);
-    if (indent) this.dedent();
+    if (indent) this.indent--;
   }
 
   printBlock(body: t.Statement) {
@@ -804,7 +790,7 @@ class Printer {
     }
 
     const hasSpace = this.endsWith(32);
-    if (indent) this.indent();
+    if (indent) this.indent++;
 
     switch (
       this._printComments(
@@ -823,7 +809,7 @@ class Printer {
         if (hasSpace) this.space();
     }
 
-    if (indent) this.dedent();
+    if (indent) this.indent--;
   }
 
   noIndentInnerCommentsHere() {
@@ -943,7 +929,7 @@ class Printer {
         `\n${" ".repeat(
           this._position.column +
             (this._queuedChar ? 1 : 0) +
-            (this.endsWith(10) ? this._indent : 0),
+            (this.endsWith(10) ? this.indent * 2 : 0),
         )}`,
       );
     } else if (!noLineTerminator) {
@@ -1112,10 +1098,10 @@ class Printer {
     column?: number,
     identifierName?: string | null,
   ) {
-    if (this._map) {
+    if (this.map) {
       if (line != null) {
         if (identifierName)
-          maybeAddMapping(this._map, {
+          maybeAddMapping(this.map, {
             name: identifierName ?? undefined,
             generated,
             source: "",
@@ -1124,7 +1110,7 @@ class Printer {
               column: column!,
             },
           });
-      } else maybeAddMapping(this._map, { generated });
+      } else maybeAddMapping(this.map, { generated });
     }
   }
 }

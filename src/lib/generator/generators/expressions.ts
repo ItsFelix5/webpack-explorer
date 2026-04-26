@@ -315,12 +315,12 @@ export function ModuleExpression(this: Printer, node: t.ModuleExpression) {
   this.word("module", "keyword", true);
   this.space();
   this.token("{", "bracket");
-  this.indent();
+  this.indent++;
   const { body } = node;
   if (body.body.length || body.directives.length) {
     this.newline();
   }
   this.print(body);
-  this.dedent();
+  this.indent--;
   this.rightBrace(node);
 }

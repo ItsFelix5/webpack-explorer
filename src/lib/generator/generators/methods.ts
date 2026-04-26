@@ -119,7 +119,7 @@ export function _methodHead(this: Printer, node: t.Method | t.TSDeclareMethod) {
     this.token("?");
   }
 
-  if (this._map) {
+  if (this.map) {
     _params.call(
       this,
       node,
@@ -168,7 +168,7 @@ export function _functionHead(
   this.space();
   if (node.id) this.print(node.id, false, false, undefined, "function");
 
-  if (this._map) _params.call(this, node, false, node.id, parent);
+  if (this.map) _params.call(this, node, false, node.id, parent);
   else _params.call(this, node, false);
   if (hasPredicate)
     _predicate.call(this, node as t.FunctionDeclaration | t.FunctionExpression);
@@ -197,7 +197,7 @@ export function ArrowFunctionExpression(
   }
 
   if (_shouldPrintArrowParamsParens.call(this, node)) {
-    _params.call(this, node, true, undefined, this._map ? parent : undefined);
+    _params.call(this, node, true, undefined, this.map ? parent : undefined);
   } else {
     this.print(node.params[0], true);
   }

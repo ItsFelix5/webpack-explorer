@@ -195,7 +195,7 @@ function enumExplicitType(
 function enumBody(context: Printer, node: t.EnumBody) {
   const { members } = node;
   context.token("{");
-  context.indent();
+  context.indent++;
   context.newline();
   for (const member of members) {
     context.print(member);
@@ -205,7 +205,7 @@ function enumBody(context: Printer, node: t.EnumBody) {
     context.token("...");
     context.newline();
   }
-  context.dedent();
+  context.indent--;
   context.token("}");
 }
 
@@ -634,12 +634,12 @@ export function ObjectTypeAnnotation(
   }
 
   if (node.inexact) {
-    this.indent();
+    this.indent++;
     this.token("...");
     if (props.length) {
       this.newline();
     }
-    this.dedent();
+    this.indent--;
   }
 
   if (node.exact) {

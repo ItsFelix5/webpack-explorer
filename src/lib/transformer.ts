@@ -275,7 +275,6 @@ export function transform(ast: ParseResult) {
   )
     fnNode.body.body.shift();
   ast.program.body = fnNode.body.body;
-  return ast;
 }
 
 function preventDestructureRename(path: t.ObjectPattern, scope: Scope) {

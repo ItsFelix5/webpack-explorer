@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => ({
   },
   resolve: {
     alias: {
-      "@": "/src",
+      "@lib": "/src/lib",
       "@data": mode === "development" ? "/src/lib/mock" : "/src/lib/interface",
     },
   },

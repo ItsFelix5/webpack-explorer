@@ -1,23 +1,25 @@
 export type Token = {
   content: string;
   offset: number;
+  reference?: number;
+  definition?: boolean;
   type:
-    | "" //
-    | "comment" //
+    | ""
+    | "comment"
     | "string"
-    | "regex" //
-    | "number" //
-    | "boolean" //
-    | "keyword" //
-    | "function" //
-    | "variable" //
-    | "builtin" //
+    | "regex"
+    | "number"
+    | "boolean"
+    | "keyword"
+    | "function"
+    | "variable"
+    | "builtin"
     | "constant"
-    | "operator" //
-    | "bracket" //
+    | "operator"
+    | "bracket"
     | "property"
-    | "indent" //
-    | "punctuation"; //
+    | "indent"
+    | "punctuation";
 };
 
 export type ThemeName = "one-dark-pro";
@@ -37,13 +39,4 @@ export type App = {
     usages: Map<number, number[]>;
   };
   tokens: Token[][];
-  search: Search;
-};
-
-export type Search = {
-  query: string;
-  filter: string;
-  wholeWord: boolean;
-  caseSensitive: boolean;
-  regex: boolean;
 };

@@ -13,6 +13,7 @@
     "moduleDetection": "force",
     "paths": {
       "@data": ["src/lib/mock"],
+      "@lib/*": ["src/lib/*"],
     },
   },
   "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"],

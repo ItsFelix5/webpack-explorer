@@ -14,13 +14,6 @@
     mappings: JSON.parse(localStorage.getItem("mappings") ?? "{}"),
     bookmarks: JSON.parse(localStorage.getItem("bookmarks") ?? "{}"),
     tokens: [],
-    search: {
-      query: "",
-      filter: "",
-      wholeWord: false,
-      caseSensitive: false,
-      regex: false,
-    },
   });
   if (isNaN(ctx.openModule!)) ctx.openModule = undefined;
   $effect(() => localStorage.setItem("open", ctx.openModule?.toString() || ""));

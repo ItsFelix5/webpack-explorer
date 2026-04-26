@@ -11,7 +11,7 @@ export function Identifier(
   parent: t.Identifier,
   type: Token["type"],
 ) {
-  if (this._map)
+  if (this.map)
     this.sourceIdentifierName(node.loc?.identifierName || node.name);
 
   this.word(node.name, type ?? "variable");

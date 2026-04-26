@@ -26,13 +26,13 @@ export function IfStatement(this: Printer, node: t.IfStatement) {
   if (needsBlock) {
     this.token("{");
     this.newline();
-    this.indent();
+    this.indent++;
   }
 
   this.printAndIndentOnComments(node.consequent);
 
   if (needsBlock) {
-    this.dedent();
+    this.indent--;
     this.newline();
     this.token("}");
   }

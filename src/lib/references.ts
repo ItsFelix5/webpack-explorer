@@ -29,5 +29,6 @@ export function getReferences(ast: ParseResult) {
       }
     },
   });
+  console.log(tokenMap, definitions, usages);
   return { tokenMap, definitions, usages };
 }

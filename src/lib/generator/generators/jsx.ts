@@ -60,11 +60,11 @@ export function JSXElement(this: Printer, node: t.JSXElement) {
   this.print(open);
   if (open.selfClosing) return;
 
-  this.indent();
+  this.indent++;
   for (const child of node.children) {
     this.print(child);
   }
-  this.dedent();
+  this.indent--;
 
   this.print(node.closingElement);
 }
@@ -105,11 +105,11 @@ export function JSXEmptyExpression(this: Printer) {
 export function JSXFragment(this: Printer, node: t.JSXFragment) {
   this.print(node.openingFragment);
 
-  this.indent();
+  this.indent++;
   for (const child of node.children) {
     this.print(child);
   }
-  this.dedent();
+  this.indent--;
 
   this.print(node.closingFragment);
 }
