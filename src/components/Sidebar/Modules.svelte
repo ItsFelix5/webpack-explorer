@@ -8,7 +8,7 @@
 
   let expanded = $state<string[]>([
     Object.entries($modules).find(([_, m]) =>
-      m.includes(ctx.openModule!),
+      m.includes(ctx.openModule! + ""),
     )?.[0] || "",
   ]);
   let draggingVertical = $state(false);

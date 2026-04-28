@@ -10,7 +10,7 @@
   let expanded = $state<(string | number)[]>([]);
   let files = $derived(
     Object.entries($modules).filter(([_, mods]) =>
-      Object.keys(mods).some((m) => ctx.bookmarks[Number(m)]?.length),
+      mods.some((m) => ctx.bookmarks[Number(m)]?.length),
     ),
   );
 </script>

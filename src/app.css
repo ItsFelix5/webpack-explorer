@@ -185,7 +185,8 @@ svg {
   color: #d19a66;
 }
 
-.constant {
+.constant,
+.class {
   color: #e5c07b;
 }
 

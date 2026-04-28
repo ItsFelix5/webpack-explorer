@@ -44,7 +44,7 @@ export function ClassDeclaration(
 
   if (node.id) {
     this.space();
-    this.print(node.id, false, false, undefined, "class");
+    this.print(node.id, false, false, undefined, { type: "class" });
   }
 
   this.print(node.typeParameters);
@@ -72,15 +72,16 @@ export { ClassDeclaration as ClassExpression };
 
 export function ClassBody(this: Printer, node: t.ClassBody) {
   this.token("{", "bracket");
-  if (node.body.length === 0) {
-    this.token("}", "bracket");
-  } else {
+  if (node.body.length === 0) this.token("}", "bracket");
+  else {
+    this.scopeStack.push({});
     const oldNoLineTerminatorAfterNode = this.enterDelimited();
     this.printJoin(node.body, true, true, null, true, true);
     this._noLineTerminatorAfterNode = oldNoLineTerminatorAfterNode;
 
     if (!this.endsWith(10)) this.newline();
 
+    this.scopeStack.pop();
     this.rightBrace(node);
   }
 }

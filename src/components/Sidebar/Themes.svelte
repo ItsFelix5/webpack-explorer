@@ -16,6 +16,7 @@
 {#each Object.entries(themes) as [id, { name, dark }]}
   <button
     class="sidebar-item"
+    style="margin-top: 5px;"
     onclick={() => (ctx.theme = id as ThemeName)}
     class:selected={ctx.theme === id}
   >

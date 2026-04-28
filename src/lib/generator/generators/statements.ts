@@ -156,12 +156,16 @@ function printStatementAfterKeyword(
 
 export function BreakStatement(this: Printer, node: t.ContinueStatement) {
   this.word("break");
+  this.validVariableSpot = false;
   printStatementAfterKeyword(this, node.label);
+  this.validVariableSpot = true;
 }
 
 export function ContinueStatement(this: Printer, node: t.ContinueStatement) {
   this.word("continue");
+  this.validVariableSpot = false;
   printStatementAfterKeyword(this, node.label);
+  this.validVariableSpot = true;
 }
 
 export function ReturnStatement(this: Printer, node: t.ReturnStatement) {
@@ -175,7 +179,9 @@ export function ThrowStatement(this: Printer, node: t.ThrowStatement) {
 }
 
 export function LabeledStatement(this: Printer, node: t.LabeledStatement) {
+  this.validVariableSpot = false;
   this.print(node.label);
+  this.validVariableSpot = true;
   this.token(":");
   this.space();
   this.print(node.body);
@@ -336,12 +342,12 @@ export function VariableDeclaration(
 }
 
 export function VariableDeclarator(this: Printer, node: t.VariableDeclarator) {
-  this.print(node.id);
+  this.print(node.id, false, false, undefined, {
+    definition: true,
+  });
   if (node.definite) this.token("!"); // TS
 
-  if (!isVoidPattern(node.id)) {
-    this.print(node.id.typeAnnotation);
-  }
+  if (!isVoidPattern(node.id)) this.print(node.id.typeAnnotation);
 
   if (node.init) {
     this.space();

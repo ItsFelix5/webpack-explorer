@@ -8,27 +8,41 @@ import type { Token } from "src/types";
 export function Identifier(
   this: Printer,
   node: t.Identifier,
-  parent: t.Identifier,
-  type: Token["type"],
+  _parent?: t.Node,
+  overrides?: Partial<Token>,
 ) {
-  if (this.map)
-    this.sourceIdentifierName(node.loc?.identifierName || node.name);
+  if (this.map && this.canMarkIdName)
+    this._sourcePosition.identifierName = node.loc?.identifierName || node.name;
 
-  this.word(node.name, type ?? "variable");
+  overrides = { ...overrides };
+  overrides.type ??= "variable";
+  if (this.validVariableSpot)
+    overrides.reference = this.getReferenceId(node.name);
+  this.word(node.name, overrides);
 }
 
 export function ArgumentPlaceholder(this: Printer) {
   this.token("?");
 }
 
-export function RestElement(this: Printer, node: t.RestElement) {
+export function RestElement(
+  this: Printer,
+  node: t.RestElement,
+  parent?: t.Node,
+  overrides?: Partial<Token>,
+) {
   this.token("...");
-  this.print(node.argument);
+  this.print(node.argument, false, false, undefined, overrides);
 }
 
 export { RestElement as SpreadElement };
 
-export function ObjectExpression(this: Printer, node: t.ObjectExpression) {
+export function ObjectExpression(
+  this: Printer,
+  node: t.ObjectExpression,
+  _parent: t.Node,
+  overrides?: Partial<Token>,
+) {
   const props = node.properties;
 
   this.token("{");
@@ -36,7 +50,7 @@ export function ObjectExpression(this: Printer, node: t.ObjectExpression) {
   if (props.length) {
     const oldNoLineTerminatorAfterNode = this.enterDelimited();
     this.space();
-    this.printList(props, null, true, true, undefined, true);
+    this.printList(props, null, true, true, undefined, true, overrides);
     this.space();
     this._noLineTerminatorAfterNode = oldNoLineTerminatorAfterNode;
   }
@@ -53,7 +67,12 @@ export function ObjectMethod(this: Printer, node: t.ObjectMethod) {
   this.print(node.body);
 }
 
-export function ObjectProperty(this: Printer, node: t.ObjectProperty) {
+export function ObjectProperty(
+  this: Printer,
+  node: t.ObjectProperty,
+  parent?: t.Node,
+  overrides?: Partial<Token>,
+) {
   this.printJoin(node.decorators);
 
   if (node.computed) {
@@ -72,7 +91,18 @@ export function ObjectProperty(this: Printer, node: t.ObjectProperty) {
       return;
     }
 
-    this.print(node.key);
+    if (
+      !t.isObjectPattern(parent) &&
+      !(
+        node.shorthand &&
+        isIdentifier(node.key) &&
+        isIdentifier(node.value) &&
+        node.key.name === node.value.name
+      )
+    )
+      this.validVariableSpot = false;
+    this.print(node.key, false, false, undefined, overrides);
+    this.validVariableSpot = true;
 
     // shorthand!
     if (
@@ -80,9 +110,8 @@ export function ObjectProperty(this: Printer, node: t.ObjectProperty) {
       isIdentifier(node.key) &&
       isIdentifier(node.value) &&
       node.key.name === node.value.name
-    ) {
+    )
       return;
-    }
   }
 
   this.token(":");
@@ -144,7 +173,7 @@ export function NumericLiteral(this: Printer, node: t.NumericLiteral) {
     Number.isInteger(node.value) &&
     !/^(0[box]|.*[eE].*|.*\.0+|.*\.)$/.test(str)
   )
-    this.setLastChar(-2);
+    this.last = -2;
 }
 
 export function StringLiteral(this: Printer, node: t.StringLiteral) {

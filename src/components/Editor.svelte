@@ -2,7 +2,6 @@
   import { transform } from "@lib/transformer";
   import { getContext, untrack } from "svelte";
   import type { App } from "src/types";
-  import { getReferences } from "@lib/references";
   import Line from "./Line.svelte";
   import { code } from "@data";
   import { parse } from "@babel/parser";
@@ -25,17 +24,13 @@
         console.time("transform");
         transform(ast);
         console.timeEnd("transform");
-        console.time("references");
-        ctx.references = getReferences(ast);
-        console.timeEnd("references");
       }
-      console.log(ast);
       console.time("tokenize");
       //const map = new GenMapping()
       //setSourceContent(map, "", fn);
       const printer = new Printer(null);
       printer.print(ast);
-      if (printer._queuedChar !== 32) printer._flush();
+      if (printer.queuedChar !== 32) printer._flush();
 
       ctx.tokens.push(...printer.tokens);
       console.timeEnd("tokenize");
@@ -55,9 +50,7 @@
 
         const original = ctx.tokens
           .flat()
-          .find(
-            (t) => ctx.references!.tokenMap.get(t.offset) == ctx.highlighted,
-          )?.content;
+          .find((t) => t.reference == ctx.highlighted)?.content;
         if (original?.startsWith("mod_")) {
           const mod = parseInt(original.substring(4));
           if (!isNaN(mod)) {

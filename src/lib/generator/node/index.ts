@@ -3,6 +3,7 @@ import { VISITOR_KEYS } from "@babel/types";
 import type * as t from "@babel/types";
 import type Printer from "../printer";
 import * as generatorFunctions from "../generators";
+import type { Token } from "src/types";
 
 export const generatorInfosMap = new Map<
   string,
@@ -11,7 +12,7 @@ export const generatorInfosMap = new Map<
       this: Printer,
       node: t.Node,
       parent?: t.Node | null,
-      typeFallback?: Token["type"],
+      overrides?: Partial<Token>,
     ) => void,
     number,
     NodeHandler<boolean> | undefined,
@@ -27,7 +28,7 @@ for (const key of Object.keys(generatorFunctions).sort() as Exclude<
   generatorInfosMap.set(key, [generatorFunctions[key], index++, undefined]);
 }
 
-export const __node = (type: t.Node["type"]) => generatorInfosMap.get(type)[1];
+export const __node = (type: t.Node["type"]) => generatorInfosMap.get(type)![1];
 
 export const enum TokenContext {
   normal = 0,

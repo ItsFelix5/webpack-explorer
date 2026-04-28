@@ -9,7 +9,7 @@
   let expanded = $state<(string | number)[]>([]);
   let files = $derived(
     Object.entries($modules).filter(([_, mods]) =>
-      Object.keys(mods).some((m) => ctx.mappings[Number(m)]),
+      mods.some((m) => ctx.mappings[Number(m)]),
     ),
   );
 </script>

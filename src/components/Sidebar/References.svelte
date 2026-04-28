@@ -4,19 +4,13 @@
   import Line from "../Line.svelte";
 
   let ctx: App = getContext("app");
-
-  const lines: number[] = $derived(
-    ctx
-      .references!.usages.get(ctx.highlighted!)
-      ?.map((usage) =>
-        ctx.tokens.findIndex((line) => line.some((t) => t.offset == usage)),
-      ) || [],
-  );
 </script>
 
 {#if ctx.highlighted}
   <div class="references">
-    {#each lines as i}
+    {#each ctx.tokens
+      .filter((l) => l.some((t) => t.reference == ctx.highlighted))
+      .map((l) => ctx.tokens.indexOf(l)) as i}
       <div
         onclick={() =>
           document

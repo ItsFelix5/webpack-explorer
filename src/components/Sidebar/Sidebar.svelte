@@ -48,7 +48,7 @@
           class="button"
           style="float: right;"
           onclick={loadModules}
-          size={16}
+          size={10}
         />
       {/if}
     </div>

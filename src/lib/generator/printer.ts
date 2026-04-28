@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
-
 import {
   isLastChild,
   parentNeedsParens,
@@ -18,15 +16,9 @@ import {
 } from "@babel/types";
 
 import { type GenMapping, maybeAddMapping } from "@jridgewell/gen-mapping";
-import type { Token } from "@babel/parser";
-import type { Token as OutputToken } from "../../types";
+import type { Token } from "../../types";
 
 const HAS_NEWLINE = /[\n\r\u2028\u2029]/;
-const HAS_NEWLINE_OR_BlOCK_COMMENT_END = /[\n\r\u2028\u2029]|\*\//;
-
-function commentIsNewline(c: t.Comment) {
-  return c.type === "CommentLine" || HAS_NEWLINE.test(c.value);
-}
 
 import { TokenContext } from "./node";
 
@@ -41,12 +33,6 @@ const enum COMMENT_SKIP_NEWLINE {
   ALL,
   LEADING,
   TRAILING,
-}
-
-const enum PRINT_COMMENT_HINT {
-  SKIP,
-  ALLOW,
-  DEFER,
 }
 
 const enum LAST_CHAR_KINDS {
@@ -71,18 +57,6 @@ const enum PRINT_COMMENTS_RESULT {
   PRINTED_ALL = 2,
 }
 
-interface PrintListOptions {
-  separator?: (this: Printer, last: boolean) => void;
-  statement?: boolean;
-  indent?: boolean;
-  printTrailingSeparator?: boolean;
-}
-
-export type PrintJoinOptions = PrintListOptions & {
-  statement?: boolean;
-  indent?: boolean;
-  trailingCommentsLineOffset?: number;
-};
 class Printer {
   constructor(map: GenMapping | null) {
     this.map = map;
@@ -90,9 +64,8 @@ class Printer {
 
   enterDelimited() {
     const oldNoLineTerminatorAfterNode = this._noLineTerminatorAfterNode;
-    if (oldNoLineTerminatorAfterNode !== null) {
+    if (oldNoLineTerminatorAfterNode !== null)
       this._noLineTerminatorAfterNode = null;
-    }
     return oldNoLineTerminatorAfterNode;
   }
 
@@ -109,11 +82,13 @@ class Printer {
 
   map: GenMapping | null = null;
   str = "";
-  tokens: OutputToken[][] = [];
-  _offset = 0;
-  _last = 0;
-  _canMarkIdName = true;
-  _queuedChar: 32 | 59 | 0 = 0;
+  tokens: Token[][] = [];
+  last = 0;
+  canMarkIdName = true;
+  queuedChar: 32 | 59 | 0 = 0;
+  scopeStack: Record<string, number>[] = [{}];
+  bindingIndex: number = 0;
+  validVariableSpot = true;
 
   _position = {
     line: 1,
@@ -129,19 +104,20 @@ class Printer {
     column: undefined,
   };
 
+  getReferenceId(name: string): number {
+    for (let i = this.scopeStack.length - 1; i >= 0; i--)
+      if (name in this.scopeStack[i]) return this.scopeStack[i][name];
+    this.scopeStack.at(-1)![name] = this.bindingIndex;
+    return this.bindingIndex++;
+  }
+
   /**
    * Add a semicolon to the buffer.
    */
-  semicolon(force: boolean = false): void {
-    if (force) {
-      this._maybeIndent();
-      this._flush();
-      this._appendChar(59, "punctuation");
-    } else {
-      this._flush();
-      this._queuedChar = 59;
-      this.setLastChar(-1);
-    }
+  semicolon(): void {
+    this._flush();
+    this.queuedChar = 59;
+    this.last = -1;
     this._noLineTerminator = false;
   }
 
@@ -163,10 +139,11 @@ class Printer {
    * Add a space to the buffer unless it is compact.
    */
   space(force: boolean = false): void {
-    if (force) this._space();
-    else {
-      const lastCp = this.getLastChar(true);
-      if (lastCp !== 0 && lastCp !== 32 && lastCp !== 10) this._space();
+    const lastCp = this.queuedChar !== 0 ? this.queuedChar : this.last;
+    if (force || (lastCp !== 0 && lastCp !== 32 && lastCp !== 10)) {
+      this._flush();
+      this.queuedChar = 32;
+      this.last = -1;
     }
   }
 
@@ -175,25 +152,23 @@ class Printer {
    */
   word(
     str: string,
-    type: OutputToken["type"] = "keyword",
+    type: Token["type"] | Partial<Token> = "keyword",
     noLineTerminatorAfter: boolean = false,
   ): void {
     this.tokenContext &= TokenContext.forInOrInitHeadAccumulatePassThroughMask;
 
     this._maybePrintInnerComments();
 
-    const lastChar = this.getLastChar();
-
     if (
-      lastChar === LAST_CHAR_KINDS.INTEGER ||
-      lastChar === LAST_CHAR_KINDS.WORD ||
+      this.last === LAST_CHAR_KINDS.INTEGER ||
+      this.last === LAST_CHAR_KINDS.WORD ||
       // prevent concatenating words and creating // comment out of division and regex
-      (lastChar === 47 && str.charCodeAt(0) === 47)
+      (this.last === 47 && str.charCodeAt(0) === 47)
     )
-      this._space();
+      this.space(true);
     this._append(str, type, false);
 
-    this.setLastChar(-3);
+    this.last = -3;
     this._noLineTerminator = noLineTerminatorAfter;
   }
 
@@ -208,7 +183,7 @@ class Printer {
    */
   token(
     str: string,
-    type: OutputToken["type"] = "",
+    type: Token["type"] | Partial<Token> = "",
     maybeNewline = false,
     mayNeedSpace: boolean = false,
   ): void {
@@ -224,33 +199,35 @@ class Printer {
         (((strFirst === 45 && str === "--") ||
           // Needs spaces to avoid changing a! == 0 to a!== 0
           strFirst === 61) &&
-          this.getLastChar() === 33) ||
+          this.last === 33) ||
         // Need spaces for operators of the same kind to avoid: `a+++b`
-        (strFirst === 43 && this.getLastChar() === 43) ||
-        (strFirst === 45 && this.getLastChar() === 45) ||
+        (strFirst === 43 && this.last === 43) ||
+        (strFirst === 45 && this.last === 45) ||
         // Needs spaces to avoid changing '34' to '34.', which would still be a valid number.
-        (strFirst === 46 && this.getLastChar() === LAST_CHAR_KINDS.INTEGER)
+        (strFirst === 46 && this.last === LAST_CHAR_KINDS.INTEGER)
       )
-        this._space();
+        this.space(true);
     }
     this._append(str, type, maybeNewline);
     this._noLineTerminator = false;
   }
 
-  tokenChar(char: number, type: OutputToken["type"]): void {
+  tokenChar(char: number, type: Token["type"]): void {
     this.tokenContext &= TokenContext.forInOrInitHeadAccumulatePassThroughMask;
 
     this._maybePrintInnerComments();
 
     if (
       // Need spaces for operators of the same kind to avoid: `a+++b`
-      (char === 43 && this.getLastChar() === 43) ||
-      (char === 45 && this.getLastChar() === 45) ||
+      (char === 43 && this.last === 43) ||
+      (char === 45 && this.last === 45) ||
       // Needs spaces to avoid changing '34' to '34.', which would still be a valid number.
-      (char === 46 && this.getLastChar() === LAST_CHAR_KINDS.INTEGER)
+      (char === 46 && this.last === LAST_CHAR_KINDS.INTEGER)
     )
-      this._space();
-    this._maybeIndent();
+      this.space(true);
+    if (this.endsWith(10))
+      for (let i = 0; i < this.indent * 2; i += 2)
+        this._appendChar(-1, "indent", 2, false);
     this._flush();
     this._appendChar(char, type);
     this._noLineTerminator = false;
@@ -266,28 +243,17 @@ class Printer {
     if (i <= 0) return;
     if (i > 2) i = 2; // Max two lines
 
-    i -= this._queuedChar === 0 && this._last === 10 ? 1 : 0;
+    i -= this.queuedChar === 0 && this.last === 10 ? 1 : 0;
 
-    for (let j = 0; j < i; j++) this._newline();
+    for (let j = 0; j < i; j++) {
+      if (this.queuedChar === 32) this.queuedChar = 0;
+      this._flush();
+      this._appendChar(10, "");
+    }
   }
 
   endsWith(char: number): boolean {
-    return this.getLastChar(true) === char;
-  }
-
-  getLastChar(checkQueue?: boolean): number {
-    if (!checkQueue) return this._last;
-    return this._queuedChar !== 0 ? this._queuedChar : this._last;
-  }
-
-  setLastChar(char: number) {
-    this._last = char;
-  }
-
-  source(prop: "start" | "end", loc: SourceLocation | undefined): void {
-    if (!loc || !this.map) return;
-
-    this._normalizePosition(prop, loc, 0);
+    return (this.queuedChar !== 0 ? this.queuedChar : this.last) === char;
   }
 
   sourceWithOffset(
@@ -295,17 +261,7 @@ class Printer {
     loc: SourceLocation | null | undefined,
     columnOffset: number,
   ): void {
-    if (!loc) return;
-
-    if (!this.map) return;
-    this._normalizePosition(prop, loc, columnOffset);
-  }
-
-  _normalizePosition(
-    prop: "start" | "end",
-    loc: SourceLocation,
-    columnOffset: number,
-  ) {
+    if (!loc || !this.map) return;
     this._flush();
 
     if (loc[prop]) {
@@ -317,37 +273,19 @@ class Printer {
     }
   }
 
-  sourceIdentifierName(
-    identifierName: string,
-    pos?: SourceLocation["start"],
+  _append(
+    str: string,
+    overrides: Token["type"] | Partial<Token>,
+    maybeNewline: boolean,
   ): void {
-    if (!this._canMarkIdName) return;
-
-    const sourcePosition = this._sourcePosition;
-    sourcePosition.identifierName = identifierName;
-  }
-
-  _space(): void {
+    if (this.endsWith(10))
+      for (let i = 0; i < this.indent * 2; i += 2)
+        this._appendChar(-1, "indent", 2, false);
     this._flush();
-    this._queuedChar = 32;
-    this.setLastChar(-1);
-  }
-
-  _newline(): void {
-    // Drop trailing spaces when a newline is inserted.
-    if (this._queuedChar === 32) this._queuedChar = 0;
-    this._flush();
-    this._appendChar(10, "");
-  }
-
-  _append(str: string, type: OutputToken["type"], maybeNewline: boolean): void {
-    this._maybeIndent();
-    this._flush();
-    const len = str.length;
     const position = this._position;
     const sourcePos = this._sourcePosition;
 
-    this._last = -1;
+    this.last = -1;
 
     while (this.tokens.length - 1 < position.line + str.split("\n").length - 1)
       this.tokens.push([]);
@@ -355,11 +293,15 @@ class Printer {
       lineIndex = position.line - 1,
       start = 0;
 
+    const overridesObj =
+      typeof overrides === "string"
+        ? { type: overrides }
+        : (overrides as object);
     while ((i = str.indexOf("\n", start)) !== -1) {
       this.tokens[lineIndex].push({
         content: str.slice(start, i + 1),
-        offset: this._offset + start,
-        type,
+        type: "",
+        ...overridesObj,
       });
 
       lineIndex++;
@@ -368,24 +310,22 @@ class Printer {
     if (start < str.length)
       this.tokens[lineIndex].push({
         content: str.slice(start),
-        offset: this._offset + start,
-        type,
+        type: "",
+        ...overridesObj,
       });
 
     this.str += str;
-    this._offset += len;
 
     if (!maybeNewline && !this.map) {
-      position.column += len;
+      position.column += str.length;
       return;
     }
 
     const { column, identifierName } = sourcePos;
     let line = sourcePos.line;
 
-    if (identifierName != null && this._canMarkIdName) {
+    if (identifierName != null && this.canMarkIdName)
       sourcePos.identifierName = undefined;
-    }
 
     i = str.indexOf("\n");
     let last = 0;
@@ -403,7 +343,7 @@ class Printer {
       // We mark the start of each line, which happens directly after this newline char
       // unless this is the last char.
       // When manually adding multi-line content (such as a comment), `line` will be `undefined`.
-      if (last < len && line !== undefined) {
+      if (last < str.length && line !== undefined) {
         line++;
         if (this.map) {
           maybeAddMapping(this.map, {
@@ -418,24 +358,23 @@ class Printer {
       }
       i = str.indexOf("\n", last);
     }
-    position.column += len - last;
+    position.column += str.length - last;
   }
 
   _flush(): void {
-    const queuedChar = this._queuedChar;
-    if (queuedChar !== 0) {
-      this._appendChar(queuedChar, "");
-      this._queuedChar = 0;
+    if (this.queuedChar !== 0) {
+      this._appendChar(this.queuedChar, "");
+      this.queuedChar = 0;
     }
   }
 
   _appendChar(
     char: number,
-    type: OutputToken["type"],
+    type: Token["type"],
     repeat: number = 1,
     useSourcePos: boolean = true,
   ): void {
-    this._last = char;
+    this.last = char;
 
     let str = char === -1 ? " " : String.fromCharCode(char);
     if (repeat > 1) str = str.repeat(repeat);
@@ -469,33 +408,23 @@ class Printer {
             generated: position,
           });
 
-        if (useSourcePos && sourcePos && char !== 32 && this._canMarkIdName)
+        if (useSourcePos && sourcePos && char !== 32 && this.canMarkIdName)
           sourcePos.identifierName = undefined;
       }
 
       position.column += repeat;
+      while (this.tokens.length - 1 < position.line) this.tokens.push([]);
+      this.tokens[position.line - 1].push({
+        content: str,
+        type,
+      });
     } else {
       position.line++;
       position.column = 0;
     }
 
-    while (this.tokens.length - 1 < position.line) this.tokens.push([]);
-    if (str != "\n")
-      this.tokens[position.line - 1].push({
-        content: str,
-        offset: this._offset,
-        type,
-      });
-
     this.str += str;
-    this._offset += repeat;
     this._position.column += repeat;
-  }
-
-  _maybeIndent(): void {
-    const indent = this.endsWith(10) ? this.indent * 2 : 0;
-    for (let i = 0; i < indent; i += 2)
-      this._appendChar(-1, "indent", 2, false);
   }
 
   print(
@@ -505,7 +434,7 @@ class Printer {
     // trailingCommentsLineOffset also used to check if called from printJoin
     // it will be ignored if `noLineTerminatorAfter||this._noLineTerminator`
     trailingCommentsLineOffset?: number,
-    typeFallback?: OutputToken["type"],
+    overrides?: Partial<Token>,
   ) {
     if (!node) return;
 
@@ -571,7 +500,9 @@ class Printer {
     if (
       !shouldPrintParens &&
       this._noLineTerminator &&
-      node.leadingComments?.some(commentIsNewline)
+      node.leadingComments?.some(
+        (c) => c.type === "CommentLine" || HAS_NEWLINE.test(c.value),
+      )
     ) {
       shouldPrintParens = true;
       indentParenthesized = true;
@@ -584,7 +515,11 @@ class Printer {
         this._noLineTerminatorAfterNode === parent &&
         isLastChild(parent, node);
       if (noLineTerminatorAfter) {
-        if (node.trailingComments?.some(commentIsNewline)) {
+        if (
+          node.trailingComments?.some(
+            (c) => c.type === "CommentLine" || HAS_NEWLINE.test(c.value),
+          )
+        ) {
           if (isExpression(node)) shouldPrintParens = true;
         } else {
           oldNoLineTerminatorAfterNode = this._noLineTerminatorAfterNode;
@@ -606,17 +541,17 @@ class Printer {
 
     this._printLeadingComments(node, parent);
 
-    this.source("start", loc ?? undefined);
+    this.sourceWithOffset("start", loc, 0);
     if (loc?.identifierName != null) {
-      this._canMarkIdName = false;
+      this.canMarkIdName = false;
       this._sourcePosition.identifierName = loc.identifierName;
     }
-    printMethod.apply(this, [node, parent, typeFallback]);
+    printMethod.apply(this, [node, parent, overrides]);
     if (loc?.identifierName != null) {
-      this._canMarkIdName = true;
+      this.canMarkIdName = true;
       this._sourcePosition.identifierName = undefined;
     }
-    this.source("end", loc ?? undefined);
+    this.sourceWithOffset("end", loc, 0);
 
     if (shouldPrintParens) {
       this._printTrailingComments(node, parent);
@@ -666,10 +601,11 @@ class Printer {
     nodes: t.Node[] | undefined | null,
     statement?: boolean,
     indent?: boolean,
-    separator?: PrintJoinOptions["separator"] | null,
+    separator?: (this: Printer, last: boolean) => void | null,
     printTrailingSeparator?: boolean | null,
     resetTokenContext?: boolean,
     trailingCommentsLineOffset?: number,
+    overrides?: Partial<Token>,
   ) {
     if (!nodes?.length) return;
 
@@ -681,15 +617,14 @@ class Printer {
       if (!node) continue;
 
       // don't add newlines at the beginning of the file
-      if (statement && i === 0 && this._last !== 0) {
-        this.newline(1);
-      }
+      if (statement && i === 0 && this.last !== 0) this.newline(1);
 
       this.print(
         node,
         false,
         resetTokenContext,
         trailingCommentsLineOffset || 0,
+        overrides,
       );
 
       if (separator != null) {
@@ -698,9 +633,8 @@ class Printer {
       }
 
       if (statement) {
-        if (i + 1 === len) {
-          this.newline(1);
-        } else {
+        if (i + 1 === len) this.newline(1);
+        else {
           const lastCommentLine = this._lastCommentLine;
           if (lastCommentLine > 0) {
             const offset =
@@ -741,7 +675,7 @@ class Printer {
     // We print inner comments here, so that if for some reason they couldn't
     // be printed in earlier locations they are still printed *somewhere*,
     // even if at the end of the node.
-    if (innerComments?.length) {
+    if (innerComments?.length)
       this._printComments(
         COMMENT_TYPE.TRAILING,
         innerComments,
@@ -749,8 +683,7 @@ class Printer {
         parent,
         lineOffset,
       );
-    }
-    if (trailingComments?.length) {
+    if (trailingComments?.length)
       this._printComments(
         COMMENT_TYPE.TRAILING,
         trailingComments,
@@ -758,9 +691,7 @@ class Printer {
         parent,
         lineOffset,
       );
-    } else {
-      this._lastCommentLine = 0;
-    }
+    else this._lastCommentLine = 0;
   }
 
   _printLeadingComments(node: t.Node, parent: t.Node | null) {
@@ -781,7 +712,7 @@ class Printer {
     }
   }
 
-  printInnerComments(indent = true, nextToken?: Token | null) {
+  printInnerComments(indent = true) {
     const node = this._currentNode!;
     const comments = node.innerComments;
     if (!comments?.length) {
@@ -799,7 +730,6 @@ class Printer {
         node,
         undefined,
         undefined,
-        nextToken,
       )
     ) {
       case PRINT_COMMENTS_RESULT.PRINTED_ALL:
@@ -838,8 +768,9 @@ class Printer {
     printTrailingSeparator?: boolean | null,
     statement?: boolean,
     indent?: boolean,
-    separator?: PrintListOptions["separator"],
+    separator?: (this: Printer, last: boolean) => void,
     resetTokenContext?: boolean,
+    overrides?: Partial<Token>,
   ) {
     this.printJoin(
       items,
@@ -852,34 +783,9 @@ class Printer {
         }),
       printTrailingSeparator,
       resetTokenContext,
+      undefined,
+      overrides,
     );
-  }
-
-  // Returns `PRINT_COMMENT_HINT.DEFER` if the comment cannot be printed in this position due to
-  // line terminators, signaling that the print comments loop can stop and
-  // resume printing comments at the next possible position. This happens when
-  // printing inner comments, since if we have an inner comment with a multiline
-  // there is at least one inner position where line terminators are allowed.
-  _shouldPrintComment(
-    comment: t.Comment,
-    nextToken?: Token | null,
-  ): PRINT_COMMENT_HINT {
-    // Some plugins (such as flow-strip-types) use this to mark comments as removed using the AST-root 'comments' property,
-    // where they can't manually mutate the AST node comment lists.
-    if (comment.ignore) return PRINT_COMMENT_HINT.SKIP;
-
-    if (this._printedComments.has(comment)) return PRINT_COMMENT_HINT.SKIP;
-
-    if (
-      this._noLineTerminator &&
-      HAS_NEWLINE_OR_BlOCK_COMMENT_END.test(comment.value)
-    ) {
-      return PRINT_COMMENT_HINT.DEFER;
-    }
-
-    this._printedComments.add(comment);
-
-    return PRINT_COMMENT_HINT.ALLOW;
   }
 
   _printComment(comment: t.Comment, skipNewLines: COMMENT_SKIP_NEWLINE) {
@@ -895,17 +801,15 @@ class Printer {
 
     if (
       printNewLines &&
-      this._last !== 0 &&
+      this.last !== 0 &&
       skipNewLines !== COMMENT_SKIP_NEWLINE.LEADING
-    ) {
+    )
       this.newline(1);
-    }
 
-    switch (this.getLastChar(true)) {
+    switch (this.queuedChar !== 0 ? this.queuedChar : this.last) {
       // Avoid converting a / operator into a line comment by appending /* to it
       case 47:
-        this._space();
-      // falls through
+        this.space();
       case 91:
       case 123:
       case 40:
@@ -928,7 +832,7 @@ class Printer {
         /\n(?!$)/g,
         `\n${" ".repeat(
           this._position.column +
-            (this._queuedChar ? 1 : 0) +
+            (this.queuedChar ? 1 : 0) +
             (this.endsWith(10) ? this.indent * 2 : 0),
         )}`,
       );
@@ -941,10 +845,14 @@ class Printer {
       val = `/*${comment.value}*/`;
     }
 
-    this.source("start", comment.loc);
+    this.sourceWithOffset("start", comment.loc, 0);
     this._append(val, "comment", isBlockComment);
 
-    if (!isBlockComment && !noLineTerminator) this._newline();
+    if (!isBlockComment && !noLineTerminator) {
+      if (this.queuedChar === 32) this.queuedChar = 0;
+      this._flush();
+      this._appendChar(10, "");
+    }
 
     if (printNewLines && skipNewLines !== COMMENT_SKIP_NEWLINE.TRAILING)
       this.newline(1);
@@ -956,7 +864,6 @@ class Printer {
     node: t.Node,
     parent?: t.Node | null,
     lineOffset: number = 0,
-    nextToken?: Token | null,
   ): PRINT_COMMENTS_RESULT {
     const nodeLoc = node.loc;
     const len = comments.length;
@@ -971,13 +878,21 @@ class Printer {
     for (let i = 0; i < len; i++) {
       const comment = comments[i];
 
-      const shouldPrint = this._shouldPrintComment(comment, nextToken);
-      if (shouldPrint === PRINT_COMMENT_HINT.DEFER) {
+      if (
+        this._noLineTerminator &&
+        /[\n\r\u2028\u2029]|\*\//.test(comment.value)
+      )
         return i === 0
           ? PRINT_COMMENTS_RESULT.PRINTED_NONE
           : PRINT_COMMENTS_RESULT.PRINTED_SOME;
-      }
-      if (hasLoc && comment.loc && shouldPrint === PRINT_COMMENT_HINT.ALLOW) {
+
+      if (
+        hasLoc &&
+        comment.loc &&
+        !comment.ignore &&
+        !this._printedComments.has(comment)
+      ) {
+        this._printedComments.add(comment);
         const commentStartLine = comment.loc.start.line;
         const commentEndLine = comment.loc.end.line;
         if (type === COMMENT_TYPE.LEADING) {
@@ -986,7 +901,7 @@ class Printer {
             // Because currently we cannot handle blank lines before leading comments,
             // we always wrap before and after multi-line comments.
             if (
-              this._last !== 0 &&
+              this.last !== 0 &&
               (comment.type === "CommentLine" ||
                 commentStartLine !== commentEndLine)
             )
@@ -1034,7 +949,8 @@ class Printer {
         }
       } else {
         hasLoc = false;
-        if (shouldPrint !== PRINT_COMMENT_HINT.ALLOW) continue;
+        if (comment.ignore || this._printedComments.has(comment)) continue;
+        this._printedComments.add(comment);
 
         if (len === 1) {
           const singleLine = comment.loc

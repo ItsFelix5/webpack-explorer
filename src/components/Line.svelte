@@ -32,8 +32,7 @@
         ? "var(--bookmark)"
         : "var(--text-muted)"}
     /></span
-  >{#each line as token, i (token)}{@const reference =
-      ctx.references!.tokenMap.get(token.offset)}{@const module =
+  >{#each line as token, i (token)}{@const module =
       i >= 2 &&
       line.length > i + 1 &&
       line[i - 2].content == "require" &&
@@ -42,26 +41,27 @@
         ? parseInt(token.content)
         : NaN}<span
       class={token.type}
-      class:highlighted={reference != undefined && ctx.highlighted == reference}
-      class:highlighted-hover={reference != undefined &&
-        ctx.hovered == reference}
+      class:highlighted={token.reference != undefined &&
+        ctx.highlighted == token.reference}
+      class:highlighted-hover={token.reference != undefined &&
+        ctx.hovered == token.reference}
       class:module={!isNaN(module)}
-      data-offset={token.offset}
-      data-definition={ctx.references!.definitions.get(token.offset)}
+      data-definition={token.definition && token.reference}
       onclick={(e) => {
         if (e.button != 0 || !interactive) return;
-        ctx.highlighted = reference;
+        ctx.highlighted = token.reference;
         if (e.ctrlKey && !isNaN(module)) ctx.openModule = module;
         else if (e.ctrlKey)
           document
-            .querySelector(`[data-definition="${reference}"]`)
+            .querySelector(`[data-definition="${token.reference}"]`)
             ?.scrollIntoView({ behavior: "smooth" });
       }}
-      onmouseover={() => (ctx.hovered = reference)}
+      onmouseover={() => (ctx.hovered = token.reference)}
       onmouseout={() => (ctx.hovered = undefined)}
-      >{(token.content.startsWith("mod_")
-        ? ctx.mappings[parseInt(token.content.substring(4))]?.[-1]
-        : reference != undefined &&
-          ctx.mappings[ctx.openModule!]?.[reference]) || token.content}</span
+      >{(token.content.startsWith("mod_") &&
+        ctx.mappings[parseInt(token.content.substring(4))]?.[-1]) ||
+        (token.reference != undefined &&
+          ctx.mappings[ctx.openModule!]?.[token.reference]) ||
+        token.content}</span
     >{/each}
 </div>

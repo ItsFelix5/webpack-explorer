@@ -1,6 +1,5 @@
 export type Token = {
   content: string;
-  offset: number;
   reference?: number;
   definition?: boolean;
   type:
@@ -17,7 +16,7 @@ export type Token = {
     | "constant"
     | "operator"
     | "bracket"
-    | "property"
+    | "class"
     | "indent"
     | "punctuation";
 };
@@ -33,10 +32,5 @@ export type App = {
   bookmarks: Record<number, number[]>;
   highlighted?: number;
   hovered?: number;
-  references?: {
-    tokenMap: Map<number, number>;
-    definitions: Map<number, number>;
-    usages: Map<number, number[]>;
-  };
   tokens: Token[][];
 };

@@ -2,6 +2,7 @@ import type Printer from "../printer";
 import { isLiteral, isMemberExpression, isPattern } from "@babel/types";
 import * as t from "@babel/types";
 import { TokenContext } from "../node";
+import type { Token } from "src/types";
 
 export function UnaryExpression(this: Printer, node: t.UnaryExpression) {
   const { operator } = node;
@@ -124,27 +125,23 @@ export function OptionalMemberExpression(
 
   this.print(node.object);
 
-  if (!computed && isMemberExpression(property)) {
+  if (!computed && isMemberExpression(property))
     throw new TypeError("Got a MemberExpression for MemberExpression property");
-  }
 
   // @ts-expect-error todo(flow->ts) maybe instead of typeof check specific literal types?
-  if (isLiteral(property) && typeof property.value === "number") {
+  if (isLiteral(property) && typeof property.value === "number")
     computed = true;
-  }
-  if (optional) {
-    this.token("?.", "punctuation");
-  }
+  if (optional) this.token("?.", "punctuation");
 
   if (computed) {
     this.token("[", "bracket");
     this.print(property);
     this.token("]", "bracket");
   } else {
-    if (!optional) {
-      this.token(".", "punctuation");
-    }
+    if (!optional) this.token(".", "punctuation");
+    this.validVariableSpot = false;
     this.print(property);
+    this.validVariableSpot = true;
   }
 }
 
@@ -152,7 +149,7 @@ export function OptionalCallExpression(
   this: Printer,
   node: t.OptionalCallExpression,
 ) {
-  this.print(node.callee, false, false, undefined, "function");
+  this.print(node.callee, false, false, undefined, { type: "function" });
 
   if (node.optional) this.token("?.", "punctuation");
 
@@ -162,7 +159,7 @@ export function OptionalCallExpression(
 }
 
 export function CallExpression(this: Printer, node: t.CallExpression) {
-  this.print(node.callee, false, false, undefined, "function");
+  this.print(node.callee, false, false, undefined, { type: "function" });
   this.print(node.typeArguments);
   _printExpressionArguments.call(this, node);
 }
@@ -193,10 +190,6 @@ export function YieldExpression(this: Printer, node: t.YieldExpression) {
   } else {
     this.word("yield");
   }
-}
-
-export function EmptyStatement(this: Printer) {
-  this.semicolon(true /* force */);
 }
 
 export function ExpressionStatement(
@@ -244,7 +237,7 @@ export function BinaryExpression(this: Printer, node: t.BinaryExpression) {
     this.word(operator, "operator");
   } else {
     this.token(operator, "operator", false, true);
-    this.setLastChar(operator.charCodeAt(operator.length - 1));
+    this.last = operator.charCodeAt(operator.length - 1);
   }
   this.space();
 
@@ -261,34 +254,29 @@ export function MemberExpression(
   this: Printer,
   node: t.MemberExpression,
   parent: t.MemberExpression,
+  overrides?: Partial<Token>,
 ) {
   this.print(node.object);
 
-  if (!node.computed && isMemberExpression(node.property)) {
+  if (!node.computed && isMemberExpression(node.property))
     throw new TypeError("Got a MemberExpression for MemberExpression property");
-  }
 
   let computed = node.computed;
   // @ts-expect-error todo(flow->ts) maybe use specific literal types
-  if (isLiteral(node.property) && typeof node.property.value === "number") {
+  if (isLiteral(node.property) && typeof node.property.value === "number")
     computed = true;
-  }
 
   if (computed) {
     const oldNoLineTerminatorAfterNode = this.enterDelimited();
     this.token("[", "bracket");
-    this.print(node.property, undefined, true);
+    this.print(node.property, undefined, true, undefined, overrides);
     this.token("]", "bracket");
     this._noLineTerminatorAfterNode = oldNoLineTerminatorAfterNode;
   } else {
     this.token(".", "punctuation");
-    this.print(
-      node.property,
-      false,
-      false,
-      undefined,
-      t.isCallExpression(parent) ? "function" : undefined,
-    );
+    this.validVariableSpot = false;
+    this.print(node.property, false, false, undefined, overrides);
+    this.validVariableSpot = true;
   }
 }
 
@@ -299,7 +287,7 @@ export function MetaProperty(this: Printer, node: t.MetaProperty) {
 }
 
 export function PrivateName(this: Printer, node: t.PrivateName) {
-  this.token("#", "property");
+  this.token("#");
   this.print(node.id);
 }
 

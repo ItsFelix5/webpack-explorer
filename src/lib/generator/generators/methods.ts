@@ -16,9 +16,8 @@ export function _params(
 
   if (idNode !== undefined || parentNode !== undefined) {
     const nameInfo = _getFuncIdName.call(this, idNode, parentNode);
-    if (nameInfo) {
-      this.sourceIdentifierName(nameInfo.name, nameInfo.pos);
-    }
+    if (nameInfo && this.canMarkIdName)
+      this._sourcePosition.identifierName = nameInfo.name;
   }
 
   this.token("(");
@@ -63,7 +62,9 @@ export function _param(
     undefined,
     true,
   );
-  this.print(parameter, undefined, true);
+  this.print(parameter, undefined, true, undefined, {
+    definition: true,
+  });
   if (
     // @ts-expect-error optional is not in TSParameterProperty
     parameter.optional
@@ -166,7 +167,8 @@ export function _functionHead(
   }
 
   this.space();
-  if (node.id) this.print(node.id, false, false, undefined, "function");
+  if (node.id)
+    this.print(node.id, false, false, undefined, { type: "function" });
 
   if (this.map) _params.call(this, node, false, node.id, parent);
   else _params.call(this, node, false);
@@ -196,11 +198,12 @@ export function ArrowFunctionExpression(
     this.space();
   }
 
-  if (_shouldPrintArrowParamsParens.call(this, node)) {
+  if (_shouldPrintArrowParamsParens.call(this, node))
     _params.call(this, node, true, undefined, this.map ? parent : undefined);
-  } else {
-    this.print(node.params[0], true);
-  }
+  else
+    this.print(node.params[0], true, false, undefined, {
+      definition: true,
+    });
 
   _predicate.call(this, node, true);
   this.space();

@@ -674,7 +674,7 @@ export function TSNonNullExpression(
 ) {
   this.print(node.expression);
   this.token("!");
-  this.setLastChar(33);
+  this.last = 33;
 }
 
 export function TSExportAssignment(this: Printer, node: t.TSExportAssignment) {
