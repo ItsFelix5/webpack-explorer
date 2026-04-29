@@ -192,6 +192,8 @@ export function YieldExpression(this: Printer, node: t.YieldExpression) {
   }
 }
 
+export function EmptyStatement(this: Printer) {}
+
 export function ExpressionStatement(
   this: Printer,
   node: t.ExpressionStatement,

@@ -24,12 +24,12 @@ export type Token = {
 export type ThemeName = "one-dark-pro";
 
 export type App = {
-  openModule?: number;
-  history: number[];
+  openModule?: string;
+  history: string[];
   rewrite: boolean;
   theme: ThemeName;
-  mappings: Record<number, Record<number, string>>;
-  bookmarks: Record<number, number[]>;
+  mappings: Record<string, Record<number, string>>;
+  bookmarks: Record<string, number[]>;
   highlighted?: number;
   hovered?: number;
   tokens: Token[][];

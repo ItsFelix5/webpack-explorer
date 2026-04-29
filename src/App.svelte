@@ -7,7 +7,7 @@
 
   let ready = $state(true);
   let ctx = $state<App>({
-    openModule: parseInt(localStorage.getItem("open") || ""),
+    openModule: localStorage.getItem("open") || "",
     history: JSON.parse(localStorage.getItem("history") ?? "[]"),
     rewrite: true,
     theme: (localStorage.getItem("theme") as ThemeName) || "one-dark-pro",
@@ -15,11 +15,10 @@
     bookmarks: JSON.parse(localStorage.getItem("bookmarks") ?? "{}"),
     tokens: [],
   });
-  if (isNaN(ctx.openModule!)) ctx.openModule = undefined;
   $effect(() => localStorage.setItem("open", ctx.openModule?.toString() || ""));
   $effect(() => {
     if (
-      ctx.openModule !== undefined &&
+      ctx.openModule &&
       (ctx.history.length === 0 || ctx.history[0] !== ctx.openModule)
     ) {
       ctx.history.unshift(ctx.openModule);

@@ -443,12 +443,14 @@ class Printer {
     const { type, loc, extra } = node;
 
     const nodeInfo = generatorInfosMap.get(type);
-    if (nodeInfo === undefined)
-      throw new ReferenceError(
+    if (nodeInfo === undefined) {
+      console.warn(
         `unknown node of type ${JSON.stringify(
           type,
         )} with constructor ${JSON.stringify(node.constructor.name)}`,
       );
+      return;
+    }
 
     const [printMethod, nodeId, needsParens] = nodeInfo;
 

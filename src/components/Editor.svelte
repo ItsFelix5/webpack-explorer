@@ -17,7 +17,7 @@
       ctx.tokens = [];
       console.time("full");
       console.time("get");
-      const fn = code.get(ctx.openModule! + "")!;
+      const fn = code.get(ctx.openModule!)!;
       const ast = parse(/^\s*function\s*\(/.test(fn) ? `(${fn})` : fn);
       console.timeEnd("get");
       if (ctx.rewrite) {
@@ -52,8 +52,8 @@
           .flat()
           .find((t) => t.reference == ctx.highlighted)?.content;
         if (original?.startsWith("mod_")) {
-          const mod = parseInt(original.substring(4));
-          if (!isNaN(mod)) {
+          const mod = original.substring(4);
+          if (!isNaN(parseInt(mod))) {
             module = mod;
             ref = -1;
           }

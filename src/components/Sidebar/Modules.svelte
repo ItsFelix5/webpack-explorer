@@ -8,7 +8,7 @@
 
   let expanded = $state<string[]>([
     Object.entries($modules).find(([_, m]) =>
-      m.includes(ctx.openModule! + ""),
+      m.includes(ctx.openModule!),
     )?.[0] || "",
   ]);
   let draggingVertical = $state(false);
@@ -44,7 +44,7 @@
       {file[0]}
     </button>
     {#if expanded.includes(file[0])}
-      {#each file[1].map((m) => Number(m)) as module}
+      {#each file[1] as module}
         <button
           class="sidebar-item"
           onclick={() => (ctx.openModule = module)}

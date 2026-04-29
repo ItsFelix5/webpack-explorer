@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext } from "svelte";
   import type { App } from "src/types";
-  import { code } from "@data";
+  import { code, modules } from "@data";
   import { CaseSensitive, Regex, WholeWord } from "@lucide/svelte";
 
   let ctx: App = getContext("app");
@@ -11,6 +11,7 @@
   let wholeWord = $state(false);
   let caseSensitive = $state(false);
   let filter = $state("");
+  let results: string[] | undefined = $state();
 
   let search = $derived.by(() => {
     let res = query;
@@ -30,6 +31,19 @@
       !target.isContentEditable
     )
       inputEl?.focus();
+    if (e.key === "Enter") {
+      results = [];
+      code.forEach((code, id) => {
+        if (
+          !id.includes(filter) &&
+          !Object.entries($modules).some(
+            ([file, mods]) => mods.includes(id) && file.includes(filter),
+          )
+        )
+          return;
+        if (search.test(code)) results?.push(id);
+      });
+    }
   }}
 />
 
@@ -66,8 +80,7 @@
   />
 </div>
 
-{#if query && query.length >= 2}
-  {@const results: any[] = []}
+{#if results}
   {#if results.length === 0}
     <div class="hint">No results found</div>
   {:else}
@@ -82,9 +95,14 @@
     {/each}
   {/if}
 {:else}
-  <div class="hint">
-    Type at least 2 characters to search. Keep in mind that this searches
-    original code
+  <div
+    class="hint"
+    style:color="var(--text-muted)"
+    style:font-size="10px"
+    style:position="absolute"
+    style:bottom="30px"
+  >
+    Keep in mind that this searches unformatted original code
   </div>
 {/if}
 

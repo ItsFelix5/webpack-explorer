@@ -37,20 +37,19 @@
       line.length > i + 1 &&
       line[i - 2].content == "require" &&
       line[i - 1].content == "(" &&
-      line[i + 1].content == ")"
-        ? parseInt(token.content)
-        : NaN}<span
+      line[i + 1].content == ")" &&
+      !isNaN(parseInt(token.content))}<span
       class={token.type}
       class:highlighted={token.reference != undefined &&
         ctx.highlighted == token.reference}
       class:highlighted-hover={token.reference != undefined &&
         ctx.hovered == token.reference}
-      class:module={!isNaN(module)}
+      class:module
       data-definition={token.definition && token.reference}
       onclick={(e) => {
         if (e.button != 0 || !interactive) return;
         ctx.highlighted = token.reference;
-        if (e.ctrlKey && !isNaN(module)) ctx.openModule = module;
+        if (e.ctrlKey && module) ctx.openModule = token.content;
         else if (e.ctrlKey)
           document
             .querySelector(`[data-definition="${token.reference}"]`)

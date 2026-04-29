@@ -33,9 +33,7 @@
       {file[0]}
     </button>
     {#if expanded.includes(file[0])}
-      {#each file[1]
-        .map((s) => Number(s))
-        .filter((m) => ctx.bookmarks[m]?.length) as module}
+      {#each file[1].filter((m) => ctx.bookmarks[m]?.length) as module}
         <button
           class="sidebar-item"
           onclick={() =>

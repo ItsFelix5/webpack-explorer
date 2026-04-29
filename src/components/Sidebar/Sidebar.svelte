@@ -46,9 +46,9 @@
       {tab}{#if tab == "modules"}
         <RefreshCwIcon
           class="button"
-          style="float: right;"
+          style="position: absolute; right: 8px;"
           onclick={loadModules}
-          size={10}
+          size={14}
         />
       {/if}
     </div>

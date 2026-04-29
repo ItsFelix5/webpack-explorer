@@ -32,9 +32,7 @@
       {file[0]}
     </button>
     {#if expanded.includes(file[0])}
-      {#each file[1]
-        .map((m) => Number(m))
-        .filter((m) => ctx.mappings[m]) as module}
+      {#each file[1].filter((m) => ctx.mappings[m]) as module}
         <button
           class="sidebar-item"
           onclick={() =>
