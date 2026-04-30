@@ -39,7 +39,7 @@
               },
               {
                 role: "user",
-                content: `Explain what this Slack webpack module does:\n\n${moduleCode}`,
+                content: `Explain what this webpack module does:\n\n${moduleCode}`,
               },
             ],
             stream: true,
