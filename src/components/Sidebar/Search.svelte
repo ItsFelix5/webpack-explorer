@@ -6,18 +6,12 @@
 
   let ctx: App = getContext("app");
   let inputEl: HTMLInputElement;
-  let query = $state("");
-  let regex = $state(false);
-  let wholeWord = $state(false);
-  let caseSensitive = $state(false);
-  let filter = $state("");
-  let results: string[] | undefined = $state();
 
   let search = $derived.by(() => {
-    let res = query;
-    if (!regex) res = res.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (wholeWord) res = `\\b${res}\\b`;
-    return new RegExp(res, !caseSensitive ? "i" : "");
+    let res = ctx.search.query;
+    if (!ctx.search.regex) res = res.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (ctx.search.wholeWord) res = `\\b${res}\\b`;
+    return new RegExp(res, !ctx.search.caseSensitive ? "i" : "");
   });
 </script>
 
@@ -32,16 +26,16 @@
     )
       inputEl?.focus();
     if (e.key === "Enter") {
-      results = [];
+      ctx.search.results = [];
       code.forEach((code, id) => {
         if (
-          !id.includes(filter) &&
+          !id.includes(ctx.search.filter) &&
           !Object.entries($modules).some(
-            ([file, mods]) => mods.includes(id) && file.includes(filter),
+            ([file, mods]) => mods.includes(id) && file.includes(ctx.search.filter),
           )
         )
           return;
-        if (search.test(code)) results?.push(id);
+        if (search.test(code)) ctx.search.results?.push(id);
       });
     }
   }}
@@ -50,7 +44,7 @@
 <input
   type="text"
   placeholder="Search modules..."
-  bind:value={query}
+  bind:value={ctx.search.query}
   bind:this={inputEl}
   class="search-input"
   autofocus
@@ -61,30 +55,30 @@
     type="text"
     placeholder="Filter modules"
     class="filter"
-    bind:value={filter}
+    bind:value={ctx.search.filter}
   />
   <WholeWord
-    class={"button" + (wholeWord ? " selected" : "")}
-    onclick={() => (wholeWord = !wholeWord)}
+    class={"button" + (ctx.search.wholeWord ? " selected" : "")}
+    onclick={() => (ctx.search.wholeWord = !ctx.search.wholeWord)}
     size={16}
   />
   <CaseSensitive
-    class={"button" + (caseSensitive ? " selected" : "")}
-    onclick={() => (caseSensitive = !caseSensitive)}
+    class={"button" + (ctx.search.caseSensitive ? " selected" : "")}
+    onclick={() => (ctx.search.caseSensitive = !ctx.search.caseSensitive)}
     size={16}
   />
   <Regex
-    class={"button" + (regex ? " selected" : "")}
-    onclick={() => (regex = !regex)}
+    class={"button" + (ctx.search.regex ? " selected" : "")}
+    onclick={() => (ctx.search.regex = !ctx.search.regex)}
     size={16}
   />
 </div>
 
-{#if results}
-  {#if results.length === 0}
+{#if ctx.search.results}
+  {#if ctx.search.results.length === 0}
     <div class="hint">No results found</div>
   {:else}
-    {#each results as result}
+    {#each ctx.search.results as result}
       <button
         class="sidebar-item"
         onclick={() => (ctx.openModule = result)}

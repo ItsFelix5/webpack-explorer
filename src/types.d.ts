@@ -33,4 +33,12 @@ export type App = {
   highlighted?: number;
   hovered?: number;
   tokens: Token[][];
+  search: {
+    query: string;
+    regex: boolean;
+    wholeWord: boolean;
+    caseSensitive: boolean;
+    filter: string;
+    results: string[] | undefined;
+  };
 };

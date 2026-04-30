@@ -14,6 +14,14 @@
     mappings: JSON.parse(localStorage.getItem("mappings") ?? "{}"),
     bookmarks: JSON.parse(localStorage.getItem("bookmarks") ?? "{}"),
     tokens: [],
+    search: {
+      query: "",
+      regex: false,
+      wholeWord: false,
+      caseSensitive: false,
+      filter: "",
+      results: undefined,
+    },
   });
   $effect(() => localStorage.setItem("open", ctx.openModule?.toString() || ""));
   $effect(() => {

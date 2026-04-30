@@ -15,7 +15,10 @@ export async function loadModules() {
           ),
         );
         result.forEach(([_, mods]) =>
-          mods.forEach(([id, mod]) => code.set(id, mod)),
+          mods.forEach(([id, mod]) => {
+            const num = parseInt(id);
+            code.set(isNaN(num) ? id : num.toString(), mod);
+          }),
         );
       }
     },

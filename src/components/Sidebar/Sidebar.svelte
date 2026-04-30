@@ -6,16 +6,16 @@
     BookmarkIcon,
     BookAIcon,
     PaletteIcon,
-    SettingsIcon,
     RefreshCwIcon,
+    SparklesIcon,
   } from "@lucide/svelte";
   import Modules from "./Modules.svelte";
   import Search from "./Search.svelte";
   import Themes from "./Themes.svelte";
-  import Settings from "./Settings.svelte";
   import Bookmarks from "./Bookmarks.svelte";
   import Mappings from "./Mappings.svelte";
   import References from "./References.svelte";
+  import Explain from "./Explain.svelte";
   import { loadModules } from "@data";
 
   const tabs = {
@@ -24,8 +24,8 @@
     references: AsteriskIcon,
     bookmarks: BookmarkIcon,
     mappings: BookAIcon,
+    explain: SparklesIcon,
     theme: PaletteIcon,
-    settings: SettingsIcon,
   };
 
   let width = $state(220);
@@ -57,9 +57,9 @@
       <Search />{:else if tab == "references"}
       <References />{:else if tab == "bookmarks"}
       <Bookmarks />{:else if tab == "mappings"}
-      <Mappings />{:else if tab == "theme"}
-      <Themes />{:else if tab == "settings"}
-      <Settings />
+      <Mappings />{:else if tab == "explain"}
+      <Explain />{:else if tab == "theme"}
+      <Themes />
     {/if}
   </div>
 
